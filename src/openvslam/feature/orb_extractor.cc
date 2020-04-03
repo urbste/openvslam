@@ -73,7 +73,6 @@ void orb_extractor::extract(const cv::_InputArray& in_image, const cv::_InputArr
 
     // get cv::Mat of image
     const auto image = in_image.getMat();
-    assert(image.type() == CV_8UC1);
 
     // build image pyramid
     compute_image_pyramid(image);
@@ -616,7 +615,7 @@ float orb_extractor::ic_angle(const cv::Mat& image, const cv::Point2f& point) co
 
     const auto step = static_cast<int>(image.step1());
     for (int v = 1; v <= fast_half_patch_size_; ++v) {
-        unsigned int v_sum = 0;
+        int v_sum = 0;
         const int d = u_max_.at(v);
         for (int u = -d; u <= d; ++u) {
             const int val_plus = center[u + v * step];
