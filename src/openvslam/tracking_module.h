@@ -3,6 +3,7 @@
 
 #include "openvslam/type.h"
 #include "openvslam/data/frame.h"
+#include "openvslam/gps/data.h"
 #include "openvslam/imu/data.h"
 #include "openvslam/module/initializer.h"
 #include "openvslam/module/relocalizer.h"
@@ -83,6 +84,9 @@ public:
 
     //! Queue an IMU data
     void queue_IMU_data(const imu::data& imu_data);
+
+    //! Queue an IMU data
+    void queue_GPS_data(const gps::data& gps_data);
 
     //-----------------------------------------
     // management for reset process
@@ -238,6 +242,10 @@ protected:
     // for visual-inertial tracking
 
     std::vector<imu::data> imu_data_queue_;
+
+    //-----------------------------------------
+    // for using gps data
+    std::vector<gps::data> gps_data_queue_;
 
     //-----------------------------------------
     // mapping module status
