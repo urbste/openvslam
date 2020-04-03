@@ -3,6 +3,8 @@
 #include "openvslam/io/gopro_telemetry_reader.h"
 #include "openvslam/type.h"
 #include <fstream>
+#include <iostream>
+#include <spdlog/spdlog.h>
 
 namespace openvslam {
 namespace io {
@@ -21,33 +23,47 @@ bool ReadGoProTelemetryJson(const std::string& path_to_telemetry_file,
     const auto accl = j["1"]["streams"]["ACCL"]["samples"];
     const auto gyro = j["1"]["streams"]["GYRO"]["samples"];
     const auto gps5 = j["1"]["streams"]["GPS5"]["samples"];
+    gopro_imu_data.resize(gyro.size());
+    for (unsigned int i = 0; i < gyro.size(); ++i) {
+        Vec3_t accl_vec;
+        accl_vec << accl[i]["value"][0],
+                accl[i]["value"][1], accl[i]["value"][2];
+        Vec3_t gyro_vec;
+        gyro_vec << gyro[i]["value"][0],
+                gyro[i]["value"][1], gyro[i]["value"][2];
 
-    for (const auto& e : accl) {
-        Vec3_t v;
-        v << e["value"][0], e["value"][1], e["value"][2];
-        const double timestamp = e["cts"];
-    }
-
-    for (const auto& e : gyro) {
-        Vec3_t v;
-        v << e["value"][0], e["value"][1], e["value"][2];
-        const double timestamp = e["cts"];
+        gopro_imu_data[i] = openvslam::imu::data(accl[i]["value"][0],
+                accl[i]["value"][1], accl[i]["value"][2],
+                gyro[i]["value"][0], gyro[i]["value"][1],
+                gyro[i]["value"][2], gyro[i]["cts"]);
     }
     // now set imu config
-    //const double imu_hz = 1000.0 /
-    //gopro_gps_config = openvslam::gps::config("gopro_imu",hz, Mat44_t::Identity());
+    const double imu_hz = 1000.0 / (gopro_imu_data[1].ts_ - gopro_imu_data[0].ts_);
+    gopro_imu_config = openvslam::imu::config("gopro_imu",imu_hz, Mat44_t::Identity(),
+                                              0.0,0.0,0.0,0.0);
+    spdlog::debug("Loaded GoPro IMU Telemetry. Found "+
+                  std::to_string(gopro_imu_data.size())+" datapoints.");
+    spdlog::debug("IMU was running at approx. "+std::to_string(imu_hz)+" Hz.");
 
-    for (const auto& e : gps5) {
-        Vec3_t lle;
-        Vec3_t vel2d_vel3d;
-        lle << e["value"][0], e["value"][1], e["value"][2];
-        vel2d_vel3d << e["value"][3], e["value"][4];
-        const double timestamp = e["cts"];
-        const double dop = e["precision"];
+    gopro_gps_data.resize(gps5.size());
+    for (unsigned int i = 0; i < gps5.size(); ++i) {
+        gopro_gps_data[i] = openvslam::gps::data(
+                gps5[i]["value"][0],  // longitude
+                gps5[i]["value"][1],  // latitude
+                gps5[i]["value"][2],  // height
+                gps5[i]["precision"], // precision
+                gps5[i]["fix"],       // fix
+                gps5[i]["value"][3],  // speed 2d
+                gps5[i]["value"][4],  // speed 3d
+                gps5[i]["cts"]);      // timestamp
     }
-    //const double gps_hz = 1000.0/
-    //gopro_gps_config = openvslam::gps::config("gopro_gps",gps_hz, Mat44_t::Identity());
 
+    const double gps_hz = 1000.0 / (gopro_gps_data[1].ts_ - gopro_gps_data[0].ts_);
+    gopro_gps_config = openvslam::gps::config("gopro_gps",gps_hz, Mat44_t::Identity());
+
+    spdlog::debug("Loaded GoPro GPS Telemetry. Found "+
+                  std::to_string(gopro_gps_data.size())+" datapoints.");
+    spdlog::debug("GPS was running at approx. "+std::to_string(gps_hz)+" Hz.");
 
     file.close();
 
