@@ -9,7 +9,7 @@ namespace gps {
 class config {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+    config() {}
     //! Constructor
     config(const std::string& name, const double rate_hz, const Mat44_t& rel_pose_ic);
 

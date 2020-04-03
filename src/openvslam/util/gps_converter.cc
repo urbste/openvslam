@@ -1,11 +1,10 @@
 // created by Steffen Urban April 2020, urbste@gmail.com
-#include "openvslam/util/converter.h"
+#include "openvslam/util/gps_converter.h"
 #include "openvslam/type.h"
 
 namespace openvslam {
-namespace gps_converter {
+namespace util {
 
-namespace {
 // The variables below are constants defined to aid the conversion between ECEF
 // and Geodetic coordinates.
 //
@@ -25,7 +24,6 @@ static const double a4 = 4.5577281365188637e+9;
 static const double a5 = 4.2840589930055659e+4;
 // a6 = 1-e2
 static const double a6 = 9.9330562000986220e-1;
-}  // namespace
 
 // Converts ECEF coordinates to GPS latitude, longitude, and altitude.
 Vec3_t gps_converter::ECEFToLLA(const Vec3_t& ecef) {
@@ -72,14 +70,14 @@ Vec3_t gps_converter::ECEFToLLA(const Vec3_t& ecef) {
     lat *= -1.0;
   }
 
-  return Vec3_t(RadToDeg(lat), RadToDeg(lon), alt);
+  return Vec3_t(util::DegToRad(lat), util::RadToDeg(lon), alt);
 }
 
 // Converts GPS latitude, longitude, and altitude to ECEF coordinates.
 Vec3_t gps_converter::LLAToECEF(const Vec3_t& lla) {
   Vec3_t ecef;
-  const double lat = DegToRad(lla[0]);
-  const double lon = DegToRad(lla[1]);
+  const double lat = util::DegToRad(lla[0]);
+  const double lon = util::DegToRad(lla[1]);
   const double alt = lla[2];
   const double n = a / std::sqrt(1.0 - e2 * std::sin(lat) * std::sin(lat));
   // ECEF x

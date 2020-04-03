@@ -9,7 +9,7 @@ namespace imu {
 class config {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
+    config() {}
     //! Constructor
     config(const std::string& name, const double rate_hz, const Mat44_t& rel_pose_ic,
            const double ns_acc, const double ns_gyr, const double rw_acc_bias, const double rw_gyr_bias);
