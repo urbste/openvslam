@@ -4,6 +4,7 @@
 #define OPENVSLAM_UTIL_GPS_CONVERTER_H
 
 #include "openvslam/type.h"
+#include "openvslam/gps/data.h"
 
 namespace openvslam {
 namespace util {

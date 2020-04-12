@@ -4,6 +4,7 @@
 #include "openvslam/type.h"
 #include "openvslam/data/bow_vocabulary.h"
 #include "openvslam/imu/data.h"
+#include "openvslam/gps/data.h"
 
 #include <string>
 #include <thread>
@@ -116,6 +117,9 @@ public:
 
     //! Feed an IMU data to SLAM system
     void feed_IMU_data(const imu::data& imu_data);
+
+    //! Feed an GPS data to SLAM system
+    void feed_GPS_data(const gps::data& gps_data);
 
     //-----------------------------------------
     // management for pause

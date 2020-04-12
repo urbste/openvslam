@@ -303,5 +303,6 @@ void frame::compute_stereo_from_depth(const cv::Mat& right_img_depth) {
     }
 }
 
+
 } // namespace data
 } // namespace openvslam

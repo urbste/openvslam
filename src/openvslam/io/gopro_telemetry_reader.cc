@@ -36,9 +36,10 @@ bool ReadGoProTelemetryJson(const std::string& path_to_telemetry_file,
                 accl[i]["value"][1], accl[i]["value"][2],
                 gyro[i]["value"][0], gyro[i]["value"][1],
                 gyro[i]["value"][2], gyro[i]["cts"]);
+        gopro_imu_data[i].ts_ /= 1000.0;  // to seconds
     }
     // now set imu config
-    const double imu_hz = 1000.0 / (gopro_imu_data[1].ts_ - gopro_imu_data[0].ts_);
+    const double imu_hz = 1.0 / (gopro_imu_data[1].ts_ - gopro_imu_data[0].ts_);
     gopro_imu_config = openvslam::imu::config("gopro_imu",imu_hz, Mat44_t::Identity(),
                                               0.0,0.0,0.0,0.0);
     spdlog::debug("Loaded GoPro IMU Telemetry. Found "+
@@ -56,9 +57,10 @@ bool ReadGoProTelemetryJson(const std::string& path_to_telemetry_file,
                 gps5[i]["value"][3],  // speed 2d
                 gps5[i]["value"][4],  // speed 3d
                 gps5[i]["cts"]);      // timestamp
+        gopro_gps_data[i].ts_ /= 1000.0; // to seconds
     }
 
-    const double gps_hz = 1000.0 / (gopro_gps_data[1].ts_ - gopro_gps_data[0].ts_);
+    const double gps_hz = 1.0 / (gopro_gps_data[1].ts_ - gopro_gps_data[0].ts_);
     gopro_gps_config = openvslam::gps::config("gopro_gps",gps_hz, Mat44_t::Identity());
 
     spdlog::debug("Loaded GoPro GPS Telemetry. Found "+

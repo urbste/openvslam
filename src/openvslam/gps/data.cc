@@ -21,5 +21,10 @@ data::data(const Vec3_t& llh,  const double dop_precision,
     xyz_ = openvslam::util::gps_converter::LLAToECEF(llh_);
 }
 
+void data::Set_XYZ(const Vec3_t &xyz) {
+    xyz_ = xyz;
+    llh_ = openvslam::util::gps_converter::ECEFToLLA(xyz);
+}
+
 } // namespace gps
 } // namespace openvslam

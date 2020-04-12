@@ -20,6 +20,9 @@ public:
     std::vector<openvslam::gps::data> get_gps_data() const;
     openvslam::gps::config get_gps_config() const;
 
+    void get_gps_data_at_time(const double timestamp,
+                              openvslam::gps::data& interpolated_data);
+
 private:
     std::vector<openvslam::gps::data> gps_data_;
     std::vector<openvslam::imu::data> imu_data_;

@@ -20,6 +20,9 @@ public:
     data(const Vec3_t& llh, const double dop_precision, const int fix,
          const double speed_2d, const double speed_3d, const double ts);
 
+    //! Set XYZ data
+    void Set_XYZ(const Vec3_t& xyz);
+
     //! gps measurement in latitude, longitude and height
     Vec3_t llh_;
     //! gps measurement in x y z ellipsoid coordinates

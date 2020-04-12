@@ -245,7 +245,8 @@ protected:
 
     //-----------------------------------------
     // for using gps data
-    std::vector<gps::data> gps_data_queue_;
+    // maps timestamp to gps::data
+    std::map<double, gps::data> gps_data_map_;
 
     //-----------------------------------------
     // mapping module status

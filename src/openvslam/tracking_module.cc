@@ -142,7 +142,7 @@ void tracking_module::queue_IMU_data(const imu::data& imu_data) {
 }
 
 void tracking_module::queue_GPS_data(const gps::data& gps_data) {
-    gps_data_queue_.push_back(gps_data);
+    gps_data_map_.insert(std::pair<double,gps::data>(gps_data.ts_,gps_data));
 }
 
 void tracking_module::reset() {

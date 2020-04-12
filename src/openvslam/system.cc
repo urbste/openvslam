@@ -281,6 +281,10 @@ void system::feed_IMU_data(const imu::data& imu_data) {
     tracker_->queue_IMU_data(imu_data);
 }
 
+void system::feed_GPS_data(const gps::data& gps_data) {
+    tracker_->queue_GPS_data(gps_data);
+}
+
 void system::pause_tracker() {
     tracker_->request_pause();
 }
