@@ -285,6 +285,14 @@ void system::feed_GPS_data(const gps::data& gps_data) {
     tracker_->queue_GPS_data(gps_data);
 }
 
+void system::set_use_gps_data() {
+    use_gps_data_ = true;
+}
+
+bool system::is_gps_data_used() {
+    return use_gps_data_;
+}
+
 void system::pause_tracker() {
     tracker_->request_pause();
 }

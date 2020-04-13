@@ -89,6 +89,14 @@ Mat44_t tracking_module::track_monocular_image(const cv::Mat& img, const double 
         curr_frm_ = data::frame(img_gray_, timestamp, extractor_left_, bow_vocab_, camera_, cfg_->true_depth_thr_, mask);
     }
 
+    if (system_->is_gps_data_used()) {
+        // get current gps readings and assign to frame
+        auto it = gps_data_map_.find(timestamp);
+        // check if we have a gps reading at that timestamp, if yes insert it
+        if (it != gps_data_map_.end())
+            curr_frm_.set_gps(it->second);
+    }
+
     track();
 
     const auto end = std::chrono::system_clock::now();

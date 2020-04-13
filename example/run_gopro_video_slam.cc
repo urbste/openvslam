@@ -37,6 +37,12 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                    const bool eval_log, const std::string& map_db_path) {
     // load the mask image
     const cv::Mat mask = mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE);
+
+    // build a SLAM system
+    openvslam::system SLAM(cfg, vocab_file_path);
+    // startup the SLAM process
+    SLAM.startup();
+
     // load telemetry json if provided
     gopro_input_telemetry gopro_telemetry_data;
     if (telemetry_json_path != "") {
@@ -45,12 +51,8 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                              "But could not open path "+telemetry_json_path);
             return;
         }
+        SLAM.set_use_gps_data(); // use provided GPS data
     }
-    // build a SLAM system
-    openvslam::system SLAM(cfg, vocab_file_path);
-    // startup the SLAM process
-    SLAM.startup();
-
     // create a viewer object
     // and pass the frame_publisher and the map_publisher
 #ifdef USE_PANGOLIN_VIEWER
@@ -93,9 +95,11 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                 }
                 // get gps if available
                 gopro_telemetry_data.get_gps_data_at_time(timestamp,interpolated_gps_data);
+                if (SLAM.is_gps_data_used()) {
+                    SLAM.feed_GPS_data(interpolated_gps_data);
+                }
                 // input the current frame and estimate the camera pose
                 SLAM.feed_monocular_frame(frame, timestamp, mask);
-                SLAM.feed_GPS_data(interpolated_gps_data);
             }
 
             const auto tp_2 = std::chrono::steady_clock::now();

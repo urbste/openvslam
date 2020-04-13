@@ -151,6 +151,11 @@ public:
     //!! Termination of the system is requested or not
     bool terminate_is_requested() const;
 
+    //! enable the use of GPS data
+    void set_use_gps_data();
+
+    //! query if gps data usage is enabled
+    bool is_gps_data_used();
 private:
     //! Check reset request of the system
     void check_reset_request();
@@ -214,6 +219,9 @@ private:
 
     //! mutex for flags of enable/disable loop detector
     mutable std::mutex mtx_loop_detector_;
+
+    //! use gps data
+    bool use_gps_data_ = false;
 };
 
 } // namespace openvslam

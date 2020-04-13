@@ -303,6 +303,12 @@ void frame::compute_stereo_from_depth(const cv::Mat& right_img_depth) {
     }
 }
 
+gps::data frame::get_gps() {
+    return gps_data_;
+}
 
+void frame::set_gps(const gps::data& gps_data) {
+    gps_data_ = gps_data;
+}
 } // namespace data
 } // namespace openvslam
