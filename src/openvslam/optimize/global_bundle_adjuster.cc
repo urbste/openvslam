@@ -37,7 +37,7 @@ void global_bundle_adjuster::optimize(const unsigned int lead_keyfrm_id_in_globa
 
     ::g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(algorithm);
-
+    optimizer.setVerbose(true);
     if (force_stop_flag) {
         optimizer.setForceStopFlag(force_stop_flag);
     }

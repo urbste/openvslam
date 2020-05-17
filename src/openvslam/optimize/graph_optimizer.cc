@@ -25,56 +25,56 @@ graph_optimizer::graph_optimizer(data::map_database* map_db, const bool fix_scal
 
 void graph_optimizer::optimize_gps_prior() {
 
-    // 1. optimizerを構築
+//    // 1. optimizerを構築
 
-    auto linear_solver = ::g2o::make_unique<::g2o::LinearSolverCSparse<::g2o::BlockSolverX::PoseMatrixType>>();
-    auto block_solver = ::g2o::make_unique<::g2o::BlockSolverX>(std::move(linear_solver));
-    auto algorithm = new ::g2o::OptimizationAlgorithmLevenberg(std::move(block_solver));
+//    auto linear_solver = ::g2o::make_unique<::g2o::LinearSolverCSparse<::g2o::BlockSolverX::PoseMatrixType>>();
+//    auto block_solver = ::g2o::make_unique<::g2o::BlockSolverX>(std::move(linear_solver));
+//    auto algorithm = new ::g2o::OptimizationAlgorithmLevenberg(std::move(block_solver));
 
-    ::g2o::SparseOptimizer optimizer;
-    optimizer.setAlgorithm(algorithm);
-    optimizer.setVerbose(true);
+//    ::g2o::SparseOptimizer optimizer;
+//    optimizer.setAlgorithm(algorithm);
+//    optimizer.setVerbose(true);
 
-    // get all keyframes and landmarks
-    const auto all_keyfrms = map_db_->get_all_keyframes();
-    const auto all_lms = map_db_->get_all_landmarks();
-    const unsigned int max_keyfrm_id = map_db_->get_max_keyframe_id();
+//    // get all keyframes and landmarks
+//    const auto all_keyfrms = map_db_->get_all_keyframes();
+//    const auto all_lms = map_db_->get_all_landmarks();
+//    const unsigned int max_keyfrm_id = map_db_->get_max_keyframe_id();
 
-    std::vector<g2o::se3::shot_vertex*> vertices(max_keyfrm_id + 1);
+//    std::vector<g2o::se3::shot_vertex*> vertices(max_keyfrm_id + 1);
 
-    // create edges for all keyframes in the map
-    for (auto keyfrm : all_keyfrms) {
-        if (keyfrm->will_be_erased()) {
-            continue;
-        }
+//    // create edges for all keyframes in the map
+//    for (auto keyfrm : all_keyfrms) {
+//        if (keyfrm->will_be_erased()) {
+//            continue;
+//        }
 
-        gps::data gps_prior = keyfrm->get_gps_data();
+//        gps::data gps_prior = keyfrm->get_gps_data();
 
-        if (gps_prior.fix_ == 2) {
-            auto keyfrm_vtx = new g2o::se3::shot_vertex();
+//        if (gps_prior.fix_ > 2) {
+//            auto keyfrm_vtx = new g2o::se3::shot_vertex();
 
-            const auto id = keyfrm->id_;
+//            const auto id = keyfrm->id_;
 
-            keyfrm_vtx->setEstimate(util::converter::to_g2o_SE3(keyfrm->get_cam_pose()));
-            // vertexをoptimizerにセット
-            keyfrm_vtx->setId(id);
+//            keyfrm_vtx->setEstimate(util::converter::to_g2o_SE3(keyfrm->get_cam_pose()));
+//            // vertexをoptimizerにセット
+//            keyfrm_vtx->setId(id);
 
-            auto edge = new g2o::se3::gps_prior_edge();
+//            auto edge = new g2o::se3::gps_prior_edge();
 
-            edge->setMeasurement(gps_prior.xyz_);
+//            edge->setMeasurement(gps_prior.xyz_);
 
-            edge->setInformation(Mat33_t::Identity() * 1./gps_prior.dop_precision_);
+//            edge->setInformation(Mat33_t::Identity() * 1./gps_prior.dop_precision_);
 
-            edge->setVertex(0, keyfrm_vtx);
+//            edge->setVertex(0, keyfrm_vtx);
+//            edge->setLevel(0);
+//            optimizer.addEdge(edge);
+//            optimizer.addVertex(keyfrm_vtx);
+//            vertices.at(id) = keyfrm_vtx;
+//        }
+//    }
 
-            optimizer.addEdge(edge);
-            optimizer.addVertex(keyfrm_vtx);
-            vertices.at(id) = keyfrm_vtx;
-        }
-    }
-
-    optimizer.initializeOptimization(0);
-    optimizer.optimize(100);
+//    optimizer.initializeOptimization(0);
+//    optimizer.optimize(100);
 }
 
 void graph_optimizer::optimize(data::keyframe* loop_keyfrm, data::keyframe* curr_keyfrm,

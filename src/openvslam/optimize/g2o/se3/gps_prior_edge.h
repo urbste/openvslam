@@ -42,7 +42,7 @@ class gps_prior_edge final : public ::g2o::BaseUnaryEdge<3, Vec3_t, shot_vertex>
       virtual bool read(std::istream& is);
       virtual bool write(std::ostream& os) const;
       virtual void computeError();
-      virtual void linearizeOplus(); // maybe remove that guy?
+      //virtual void linearizeOplus(); // maybe remove that guy?
       //virtual bool setMeasurementFromState();
 
       //virtual double initialEstimatePossible(const ::g2o::OptimizableGraph::VertexSet& /*from*/, ::g2o::OptimizableGraph::Vertex* /*to*/) {return 1.;}

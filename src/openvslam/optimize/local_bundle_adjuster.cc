@@ -5,6 +5,7 @@
 #include "openvslam/optimize/g2o/landmark_vertex_container.h"
 #include "openvslam/optimize/g2o/se3/shot_vertex_container.h"
 #include "openvslam/optimize/g2o/se3/reproj_edge_wrapper.h"
+#include "openvslam/optimize/g2o/se3/gps_prior_edge.h"
 #include "openvslam/util/converter.h"
 
 #include <unordered_map>
@@ -116,6 +117,10 @@ void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, boo
     // vertexに変換されたkeyframesを保存しておく
     std::unordered_map<unsigned int, data::keyframe*> all_keyfrms;
 
+    ::g2o::ParameterSE3Offset* offset = new ::g2o::ParameterSE3Offset();
+    offset->setId(0);
+    optimizer.addParameter(offset);
+
     // local keyframesをoptimizerにセット
     for (auto& id_local_keyfrm_pair : local_keyfrms) {
         auto local_keyfrm = id_local_keyfrm_pair.second;
@@ -123,9 +128,23 @@ void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, boo
         all_keyfrms.emplace(id_local_keyfrm_pair);
         auto keyfrm_vtx = keyfrm_vtx_container.create_vertex(local_keyfrm, local_keyfrm->id_ == 0);
         optimizer.addVertex(keyfrm_vtx);
+
+
+        // add gps prios to test
+        auto gps_edge = new g2o::se3::gps_prior_edge();
+        gps_edge->setMeasurement(local_keyfrm->get_gps_data().xyz_);
+        gps_edge->setInformation(Mat33_t::Identity() * (1./local_keyfrm->get_gps_data().dop_precision_));
+        gps_edge->setVertex(0, keyfrm_vtx);
+        gps_edge->setParameterId(0,0);
+        optimizer.addEdge(gps_edge);
     }
 
     // fixed keyframesをoptimizerにセット
+
+
+
+
+
     for (auto& id_fixed_keyfrm_pair : fixed_keyfrms) {
         auto fixed_keyfrm = id_fixed_keyfrm_pair.second;
 

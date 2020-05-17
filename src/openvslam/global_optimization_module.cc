@@ -99,7 +99,7 @@ void global_optimization_module::run() {
         // pass the current keyframe to the loop detector
         loop_detector_->set_current_keyframe(cur_keyfrm_);
 
-        if (cur_keyfrm_->id_ > 400) {
+        if (cur_keyfrm_->id_ > 50) {
             align_to_gps_priors();
         }
 

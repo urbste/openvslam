@@ -75,9 +75,9 @@ void gps_prior_edge::computeError() {
 //  return true;
 //}
 
-void gps_prior_edge::linearizeOplus() {
-   _jacobianOplusXi << Mat33_t::Identity();
- }
+//void gps_prior_edge::linearizeOplus() {
+//   _jacobianOplusXi << Mat33_t::Identity();
+// }
 
 //void gps_prior_edge::initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/,
 //                                     ::g2o::OptimizableGraph::Vertex* /*to_*/) {

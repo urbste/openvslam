@@ -55,6 +55,7 @@ void interpolate_gps_data_for_cam_time(const std::vector<openvslam::gps::data>& 
             }
             interpolated_gps_data.Set_XYZ(xyz);
             interpolated_gps_data.ts_ = gps_t1 + delta_t1_abs;
+            interpolated_gps_data.fix_ = gps_data[data_idx].fix_;
             // this is probably a wrong assumption but will try this for now
             interpolated_gps_data.dop_precision_ =
                     lerp(gps_data[data_idx].dop_precision_,
