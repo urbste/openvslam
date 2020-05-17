@@ -1,4 +1,5 @@
 #include "openvslam/camera/perspective.h"
+#include "openvslam/optimize/g2o/nullspace.h"
 
 #include <iostream>
 
@@ -127,13 +128,22 @@ void perspective::undistort_keypoints(const std::vector<cv::KeyPoint>& dist_keyp
     }
 }
 
-void perspective::convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts, eigen_alloc_vector<Vec3_t>& bearings) const {
+void perspective::convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts,
+                                                eigen_alloc_vector<Vec3_t>& bearings,
+                                                eigen_alloc_vector<Mat33_t>& jacobians,
+                                                eigen_alloc_vector<nullspace32_t>& nullspaces) const {
     bearings.resize(undist_keypts.size());
+    jacobians.resize(undist_keypts.size());
+    nullspaces.resize(undist_keypts.size());
     for (unsigned long idx = 0; idx < undist_keypts.size(); ++idx) {
         const auto x_normalized = (undist_keypts.at(idx).pt.x - cx_) / fx_;
         const auto y_normalized = (undist_keypts.at(idx).pt.y - cy_) / fy_;
         const auto l2_norm = std::sqrt(x_normalized * x_normalized + y_normalized * y_normalized + 1.0);
-        bearings.at(idx) = Vec3_t{x_normalized / l2_norm, y_normalized / l2_norm, 1.0 / l2_norm};
+        const auto bearing = Vec3_t{x_normalized / l2_norm, y_normalized / l2_norm, 1.0 / l2_norm};
+        bearings.at(idx) = bearing;
+        jacobians.at(idx) =  1.0 / l2_norm * (Mat33_t::Identity() - bearing*bearing.transpose()) /
+                (bearing.transpose()*bearing);
+        optimize::g2o::nullS_3x2_templated<double>(bearing, nullspaces[idx]);
     }
 }
 

@@ -61,6 +61,9 @@ using VecX_t = Eigen::VectorXd;
 
 using Quat_t = Eigen::Quaterniond;
 
+// nullspace type
+using nullspace43_t = Eigen::Matrix<double, 4, 3>;
+using nullspace32_t = Eigen::Matrix<double, 3, 2>;
 // STL with Eigen custom allocator
 
 template<typename T>

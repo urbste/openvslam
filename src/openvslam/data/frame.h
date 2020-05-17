@@ -104,6 +104,12 @@ public:
     void set_cam_pose(const g2o::SE3Quat& cam_pose_cw);
 
     /**
+     * Set camera pose and refresh rotation and translation
+     * @param cam_pose_cw
+     */
+    void set_cam_pose_min(const Vec6_t& cam_pose_cw);
+
+    /**
      * Update rotation and translation using cam_pose_cw_
      */
     void update_pose_params();
@@ -191,6 +197,10 @@ public:
     std::vector<cv::KeyPoint> undist_keypts_;
     //! bearing vectors
     eigen_alloc_vector<Vec3_t> bearings_;
+    //! nullspace of bearings
+    eigen_alloc_vector<nullspace32_t> bearings_nullspace_;
+    //! jacobian of bearing
+    eigen_alloc_vector<Mat33_t> bearings_jac_;
 
     //! disparities
     std::vector<float> stereo_x_right_;

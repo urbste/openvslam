@@ -111,6 +111,15 @@ else()
 endif()
 message(STATUS "BoW framework: ${BOW_FRAMEWORK} (found in ${BoW_INCLUDE_DIR})")
 
+# ----- FLAG to compile homogeneous landmark parametrization -----
+set(USE_HOMOGENEOUS_LANDMARKS ON CACHE BOOL  "Select if homogeneous landmarks should be used.")
+if(USE_HOMOGENEOUS_LANDMARKS)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC USE_HOMOGENEOUS_LANDMARKS)
+    message(STATUS "Homogeneous Landmarks: ENABLED")
+else()
+    message(STATUS "Homogeneous Landmarks: DISABLED")
+endif()
+
 # ----- Configure OpenVSLAM library -----
 
 # Include directories

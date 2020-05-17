@@ -39,7 +39,7 @@ public:
      */
     unsigned int optimize(data::keyframe* keyfrm_1, data::keyframe* keyfrm_2,
                           std::vector<data::landmark*>& matched_lms_in_keyfrm_2,
-                          g2o::Sim3& g2o_Sim3_12, const float chi_sq) const;
+                          ::g2o::Sim3& g2o_Sim3_12, const float chi_sq) const;
 
 private:
     //! transform is Sim3 or SE3

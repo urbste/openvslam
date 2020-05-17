@@ -41,7 +41,10 @@ public:
         return bearing;
     }
 
-    void convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts, eigen_alloc_vector<Vec3_t>& bearings) const override final;
+    void convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts,
+                                       eigen_alloc_vector<Vec3_t>& bearings,
+                                       eigen_alloc_vector<Mat33_t>& jacobians,
+                                       eigen_alloc_vector<nullspace32_t>& nullspaces) const override final;
 
     cv::KeyPoint convert_bearing_to_keypoint(const Vec3_t& bearing) const override final {
         cv::KeyPoint undistorted;

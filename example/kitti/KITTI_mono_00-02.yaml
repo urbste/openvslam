@@ -19,7 +19,7 @@ Camera.p1: 0.0
 Camera.p2: 0.0
 Camera.k3: 0.0
 
-Camera.fps: 10.0
+Camera.fps: 5.0
 Camera.cols: 1241
 Camera.rows: 376
 

@@ -30,7 +30,7 @@ Camera.color_order: "Gray"
 # ORB Parameters #
 #================#
 
-Feature.max_num_keypoints: 1000
+Feature.max_num_keypoints: 1200
 Feature.scale_factor: 1.2
 Feature.num_levels: 8
 Feature.ini_fast_threshold: 20

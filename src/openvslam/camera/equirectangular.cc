@@ -1,4 +1,5 @@
 #include "openvslam/camera/equirectangular.h"
+#include "openvslam/optimize/g2o/nullspace.h"
 
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
@@ -42,16 +43,25 @@ void equirectangular::undistort_keypoints(const std::vector<cv::KeyPoint>& dist_
     undist_keypts = dist_keypts;
 }
 
-void equirectangular::convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts, eigen_alloc_vector<Vec3_t>& bearings) const {
+void equirectangular::convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts,
+                                                    eigen_alloc_vector<Vec3_t>& bearings,
+                                                    eigen_alloc_vector<Mat33_t>& jacobians,
+                                                    eigen_alloc_vector<nullspace32_t>& nullspaces) const {
     bearings.resize(undist_keypts.size());
+    jacobians.resize(undist_keypts.size());
+    nullspaces.resize(undist_keypts.size());
     for (unsigned int idx = 0; idx < undist_keypts.size(); ++idx) {
         // convert to unit polar coordinates
         const double lon = (undist_keypts.at(idx).pt.x / cols_ - 0.5) * (2 * M_PI);
         const double lat = -(undist_keypts.at(idx).pt.y / rows_ - 0.5) * M_PI;
         // convert to equirectangular coordinates
-        bearings.at(idx)(0) = std::cos(lat) * std::sin(lon);
-        bearings.at(idx)(1) = -std::sin(lat);
-        bearings.at(idx)(2) = std::cos(lat) * std::cos(lon);
+        Vec3_t bearing;
+        bearing<< std::cos(lat) * std::sin(lon), -std::sin(lat),std::cos(lat) * std::cos(lon);
+        bearings.at(idx) = bearing;
+        jacobians.at(idx) = (Mat33_t::Identity() - bearing*bearing.transpose()) /
+                (bearing.transpose()*bearing);
+        optimize::g2o::nullS_3x2_templated<double>(bearing, nullspaces[idx]);
+
     }
 }
 

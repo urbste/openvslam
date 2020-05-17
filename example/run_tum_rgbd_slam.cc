@@ -78,6 +78,7 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                 if (0.0 < wait_time) {
                     std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(wait_time * 1e6)));
                 }
+                //std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(0.1*1e6)));
             }
 
             // check if the termination of SLAM system is requested or not

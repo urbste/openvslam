@@ -5,6 +5,7 @@
 #include "openvslam/camera/base.h"
 #include "openvslam/data/graph_node.h"
 #include "openvslam/data/bow_vocabulary.h"
+#include "openvslam/optimize/g2o/se3/SE3hom.h"
 
 #include <set>
 #include <mutex>
@@ -58,6 +59,7 @@ public:
              const Mat44_t& cam_pose_cw, camera::base* camera, const float depth_thr,
              const unsigned int num_keypts, const std::vector<cv::KeyPoint>& keypts,
              const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
+             const eigen_alloc_vector<Mat33_t> bearings_jac, const eigen_alloc_vector<nullspace32_t> bearings_nullspace,
              const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
              const unsigned int num_scale_levels, const float scale_factor,
              bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db);
@@ -79,6 +81,11 @@ public:
      * Set camera pose
      */
     void set_cam_pose(const g2o::SE3Quat& cam_pose_cw);
+
+    /**
+     * Set camera pose
+     */
+    void set_cam_pose_min(const Vec6_t& cam_pose_cw_min);
 
     /**
      * Get the camera pose
@@ -242,6 +249,10 @@ public:
     const std::vector<cv::KeyPoint> undist_keypts_;
     //! bearing vectors
     const eigen_alloc_vector<Vec3_t> bearings_;
+    //! nullspace of bearings
+    eigen_alloc_vector<nullspace32_t> bearings_nullspace_;
+    //! jacobian of bearing
+    eigen_alloc_vector<Mat33_t> bearings_jac_;
 
     //! keypoint indices in each of the cells
     const std::vector<std::vector<std::vector<unsigned int>>> keypt_indices_in_cells_;

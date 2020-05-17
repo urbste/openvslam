@@ -7,6 +7,8 @@
 #include "openvslam/data/landmark.h"
 #include "openvslam/feature/orb_extractor.h"
 #include "openvslam/match/stereo.h"
+#include "openvslam/optimize/g2o/nullspace.h"
+#include "openvslam/optimize/g2o/se3/SE3hom.h"
 
 #include <thread>
 
@@ -41,7 +43,7 @@ frame::frame(const cv::Mat& img_gray, const double timestamp,
     depths_ = std::vector<float>(num_keypts_, -1);
 
     // Convert to bearing vector
-    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
+    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_, bearings_jac_, bearings_nullspace_);
 
     // Initialize association with 3D points
     landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
@@ -81,7 +83,7 @@ frame::frame(const cv::Mat& left_img_gray, const cv::Mat& right_img_gray, const 
     stereo_matcher.compute(stereo_x_right_, depths_);
 
     // Convert to bearing vector
-    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
+    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_, bearings_jac_, bearings_nullspace_);
 
     // Initialize association with 3D points
     landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
@@ -114,7 +116,7 @@ frame::frame(const cv::Mat& img_gray, const cv::Mat& img_depth, const double tim
     compute_stereo_from_depth(img_depth);
 
     // Convert to bearing vector
-    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
+    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_, bearings_jac_, bearings_nullspace_);
 
     // Initialize association with 3D points
     landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
@@ -132,6 +134,12 @@ void frame::set_cam_pose(const Mat44_t& cam_pose_cw) {
 
 void frame::set_cam_pose(const g2o::SE3Quat& cam_pose_cw) {
     set_cam_pose(util::converter::to_eigen_mat(cam_pose_cw));
+}
+
+void frame::set_cam_pose_min(const Vec6_t& cam_pose_cw_min) {
+    Mat44_t cam_pose_cw;
+    optimize::g2o::se3::vec_6_to_world_to_cam(cam_pose_cw_min, cam_pose_cw);
+    set_cam_pose(cam_pose_cw);
 }
 
 void frame::update_pose_params() {

@@ -26,7 +26,8 @@ public:
     void computeError() override {
         const auto v1 = static_cast<const shot_vertex*>(_vertices.at(0));
         const Vec2_t obs(_measurement);
-        _error = obs - cam_project(v1->estimate().map(pos_w_));
+        const Vec2_t projected = cam_project(v1->estimate().map(pos_w_));
+        _error = obs - projected;
     }
 
     void linearizeOplus() override;

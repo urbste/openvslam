@@ -148,7 +148,10 @@ public:
     virtual Vec3_t convert_keypoint_to_bearing(const cv::KeyPoint& undist_keypt) const = 0;
 
     //! Convert undistorted keypoints to bearing vectors
-    virtual void convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts, eigen_alloc_vector<Vec3_t>& bearings) const = 0;
+    virtual void convert_keypoints_to_bearings(const std::vector<cv::KeyPoint>& undist_keypts,
+                                               eigen_alloc_vector<Vec3_t>& bearings,
+                                               eigen_alloc_vector<Mat33_t>& jacobians,
+                                               eigen_alloc_vector<nullspace32_t>& nullspaces) const = 0;
 
     //! Convert bearing vector to undistorted keypoint
     virtual cv::KeyPoint convert_bearing_to_keypoint(const Vec3_t& bearing) const = 0;

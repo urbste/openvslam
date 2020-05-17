@@ -6,6 +6,7 @@
 
 #include "openvslam/system.h"
 #include "openvslam/config.h"
+#include "openvslam/optimize/adept/adept_source.h"
 
 #include <iostream>
 #include <chrono>

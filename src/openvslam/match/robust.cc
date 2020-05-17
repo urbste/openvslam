@@ -108,11 +108,13 @@ unsigned int robust::match_for_triangulation(data::keyframe* keyfrm_1, data::key
                         const auto cos_dist = epiplane_in_keyfrm_2.dot(bearing_2);
                         // epipoleとbearingの挟角の閾値(=3.0deg)
                         constexpr double cos_dist_thr = 0.99862953475;
-
+#ifndef USE_HOMOGENEOUS_LANDMARKS
+                        // only do this if we are not using homogeneous world points
                         // 挟角が閾値より小さければmatchさせない
                         if (cos_dist_thr < cos_dist) {
                             continue;
                         }
+#endif
                     }
 
                     // E行列による整合性チェック

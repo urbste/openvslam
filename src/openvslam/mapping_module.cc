@@ -203,7 +203,7 @@ void mapping_module::store_new_keyframe() {
 void mapping_module::create_new_landmarks() {
     // get the covisibilities of `cur_keyfrm_`
     // in order to triangulate landmarks between `cur_keyfrm_` and each of the covisibilities
-    constexpr unsigned int num_covisibilities = 10;
+    constexpr unsigned int num_covisibilities = 5;
     const auto cur_covisibilities = cur_keyfrm_->graph_node_->get_top_n_covisibilities(num_covisibilities * (is_monocular_ ? 2 : 1));
 
     // lowe's_ratio will not be used

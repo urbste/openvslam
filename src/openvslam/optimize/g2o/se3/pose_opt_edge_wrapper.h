@@ -5,8 +5,9 @@
 #include "openvslam/camera/fisheye.h"
 #include "openvslam/camera/equirectangular.h"
 #include "openvslam/optimize/g2o/se3/perspective_pose_opt_edge.h"
+#include "openvslam/optimize/g2o/se3/perspective_pose_opt_edge_hom.h"
 #include "openvslam/optimize/g2o/se3/equirectangular_pose_opt_edge.h"
-
+#include "openvslam/optimize/adept/adept.h"
 #include <g2o/core/robust_kernel_impl.h>
 
 namespace openvslam {
@@ -27,6 +28,13 @@ public:
     pose_opt_edge_wrapper(T* shot, shot_vertex* shot_vtx, const Vec3_t& pos_w,
                           const unsigned int idx, const float obs_x, const float obs_y, const float obs_x_right,
                           const float inv_sigma_sq, const float sqrt_chi_sq);
+
+    pose_opt_edge_wrapper(T* shot, shot_vertex_hom* shot_vtx, const Vec3_t& pos_w,
+                          const unsigned int idx, const float obs_x, const float obs_y, const float obs_x_right,
+                          const float inv_sigma_sq, const float sqrt_chi_sq,
+                          const Vec3_t& bearing = Vec3_t::Zero(),
+                          const Mat33_t& bearing_jac = Mat33_t::Zero(),
+                          const nullspace32_t& bearing_ns = nullspace32_t::Zero());
 
     virtual ~pose_opt_edge_wrapper() = default;
 
@@ -54,6 +62,7 @@ public:
     T* shot_;
     const unsigned int idx_;
     const bool is_monocular_;
+    const bool use_hom_= false;
 };
 
 template<typename T>
@@ -170,9 +179,142 @@ pose_opt_edge_wrapper<T>::pose_opt_edge_wrapper(T* shot, shot_vertex* shot_vtx, 
     }
 
     // loss functionを設定
-    auto huber_kernel = new ::g2o::RobustKernelHuber();
-    huber_kernel->setDelta(sqrt_chi_sq);
-    edge_->setRobustKernel(huber_kernel);
+    //if () {
+        auto huber_kernel = new ::g2o::RobustKernelHuber();
+        huber_kernel->setDelta(1.345);
+        edge_->setRobustKernel(huber_kernel);
+
+        //auto kernel = new ::g2o::RobustKernelGemanMcClure();
+        //edge_->setRobustKernel(kernel);
+    //}
+}
+
+template<typename T>
+pose_opt_edge_wrapper<T>::pose_opt_edge_wrapper(T* shot, shot_vertex_hom* shot_vtx, const Vec3_t& pos_w,
+                                                const unsigned int idx, const float obs_x, const float obs_y, const float obs_x_right,
+                                                const float inv_sigma_sq, const float sqrt_chi_sq,
+                                                const Vec3_t& bearing,
+                                                const Mat33_t& bearing_jac,
+                                                const nullspace32_t& bearing_ns)
+    : camera_(shot->camera_), shot_(shot), idx_(idx), is_monocular_(obs_x_right < 0), use_hom_(true) {
+    // 拘束条件を設定
+    switch (camera_->model_type_) {
+        case camera::model_type_t::Perspective: {
+            auto c = static_cast<camera::perspective*>(camera_);
+            if (is_monocular_) {
+
+                auto edge = new mono_perspective_pose_opt_edge_hom();
+                Mat33_t inv_cam_mat;
+                inv_cam_mat<<c->fx_inv_, 0.0, -c->cx_*c->fx_inv_,
+                                0.0, c->fy_inv_, -c->cy_*c->fy_inv_,
+                                0.0,0.0,1.0;
+
+                Mat22_t information;
+                get_information_for_bearing<double>(1.0 / inv_sigma_sq, inv_cam_mat,
+                                            bearing_jac, bearing_ns, information);
+                edge->setMeasurement(bearing);
+                edge->setInformation(information);
+
+                edge->pos_w_hom_ = pos_w.homogeneous().normalized();
+                edge->setVertex(0, shot_vtx);
+
+                edge_ = edge;
+            }
+            else {
+//                auto edge = new stereo_perspective_pose_opt_edge();
+
+//                const Vec3_t obs{obs_x, obs_y, obs_x_right};
+//                edge->setMeasurement(obs);
+//                edge->setInformation(Mat33_t::Identity() * inv_sigma_sq);
+
+//                edge->fx_ = c->fx_;
+//                edge->fy_ = c->fy_;
+//                edge->cx_ = c->cx_;
+//                edge->cy_ = c->cy_;
+//                edge->focal_x_baseline_ = camera_->focal_x_baseline_;
+
+//                edge->pos_w_ = pos_w;
+
+//                edge->setVertex(0, shot_vtx);
+
+//                edge_ = edge;
+            }
+            break;
+        }
+        case camera::model_type_t::Fisheye: {
+            auto c = static_cast<camera::fisheye*>(camera_);
+            if (is_monocular_) {
+                auto edge = new mono_perspective_pose_opt_edge_hom();
+                Mat33_t inv_cam_mat;
+                inv_cam_mat<<c->fx_inv_, 0.0, -c->cx_*c->fx_inv_,
+                                0.0, c->fy_inv_, -c->cy_*c->fy_inv_,
+                                0.0,0.0,1.0;
+
+                Mat22_t information;
+                get_information_for_bearing<double>(1.0 / inv_sigma_sq, inv_cam_mat,
+                                            bearing_jac, bearing_ns, information);
+                edge->setMeasurement(bearing);
+                edge->setInformation(information);
+
+                edge->pos_w_hom_ = pos_w.homogeneous().normalized();
+                edge->setVertex(0, shot_vtx);
+
+                edge_ = edge;
+            }
+            else {
+//                auto edge = new stereo_perspective_pose_opt_edge();
+
+//                const Vec3_t obs{obs_x, obs_y, obs_x_right};
+//                edge->setMeasurement(obs);
+//                edge->setInformation(Mat33_t::Identity() * inv_sigma_sq);
+
+//                edge->fx_ = c->fx_;
+//                edge->fy_ = c->fy_;
+//                edge->cx_ = c->cx_;
+//                edge->cy_ = c->cy_;
+//                edge->focal_x_baseline_ = camera_->focal_x_baseline_;
+
+//                edge->pos_w_ = pos_w;
+
+//                edge->setVertex(0, shot_vtx);
+
+//                edge_ = edge;
+            }
+            break;
+        }
+        case camera::model_type_t::Equirectangular: {
+            assert(is_monocular_);
+
+            auto c = static_cast<camera::equirectangular*>(camera_);
+
+            auto edge = new equirectangular_pose_opt_edge();
+
+            const Vec2_t obs{obs_x, obs_y};
+            edge->setMeasurement(obs);
+            edge->setInformation(Mat22_t::Identity() * inv_sigma_sq);
+
+            edge->cols_ = c->cols_;
+            edge->rows_ = c->rows_;
+
+            edge->pos_w_ = pos_w;
+
+            edge->setVertex(0, shot_vtx);
+
+            edge_ = edge;
+
+            break;
+        }
+    }
+
+    // loss functionを設定
+    //if () {
+        auto huber_kernel = new ::g2o::RobustKernelHuber();
+        huber_kernel->setDelta(1.345);
+        edge_->setRobustKernel(huber_kernel);
+
+        //auto kernel = new ::g2o::RobustKernelGemanMcClure();
+        //edge_->setRobustKernel(kernel);
+    //}
 }
 
 template<typename T>
@@ -180,6 +322,8 @@ bool pose_opt_edge_wrapper<T>::depth_is_positive() const {
     switch (camera_->model_type_) {
         case camera::model_type_t::Perspective: {
             if (is_monocular_) {
+                if (use_hom_)
+                    return static_cast<mono_perspective_pose_opt_edge_hom*>(edge_)->mono_perspective_pose_opt_edge_hom::depth_is_positive();
                 return static_cast<mono_perspective_pose_opt_edge*>(edge_)->mono_perspective_pose_opt_edge::depth_is_positive();
             }
             else {
@@ -188,6 +332,8 @@ bool pose_opt_edge_wrapper<T>::depth_is_positive() const {
         }
         case camera::model_type_t::Fisheye: {
             if (is_monocular_) {
+                if (use_hom_)
+                    return static_cast<mono_perspective_pose_opt_edge_hom*>(edge_)->mono_perspective_pose_opt_edge_hom::depth_is_positive();
                 return static_cast<mono_perspective_pose_opt_edge*>(edge_)->mono_perspective_pose_opt_edge::depth_is_positive();
             }
             else {

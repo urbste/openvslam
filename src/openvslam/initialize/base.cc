@@ -127,7 +127,6 @@ unsigned int base::check_pose(const Mat33_t& rot_ref_to_cur, const Vec3_t& trans
         const Vec3_t cur_normal = pos_c_in_ref - cur_cam_center;
         const float cur_norm = cur_normal.norm();
         const float cos_parallax = ref_normal.dot(cur_normal) / (ref_norm * cur_norm);
-
         const bool parallax_is_small = cos_parallax_thr < cos_parallax;
 
         // reject if the 3D point is in front of the cameras

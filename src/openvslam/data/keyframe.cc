@@ -23,7 +23,8 @@ keyframe::keyframe(const frame& frm, map_database* map_db, bow_database* bow_db)
       // camera parameters
       camera_(frm.camera_), depth_thr_(frm.depth_thr_),
       // constant observations
-      num_keypts_(frm.num_keypts_), keypts_(frm.keypts_), undist_keypts_(frm.undist_keypts_), bearings_(frm.bearings_),
+      num_keypts_(frm.num_keypts_), keypts_(frm.keypts_), undist_keypts_(frm.undist_keypts_),
+      bearings_(frm.bearings_), bearings_jac_(frm.bearings_jac_), bearings_nullspace_(frm.bearings_nullspace_),
       keypt_indices_in_cells_(frm.keypt_indices_in_cells_),
       stereo_x_right_(frm.stereo_x_right_), depths_(frm.depths_), descriptors_(frm.descriptors_.clone()),
       // BoW
@@ -46,6 +47,7 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
                    const Mat44_t& cam_pose_cw, camera::base* camera, const float depth_thr,
                    const unsigned int num_keypts, const std::vector<cv::KeyPoint>& keypts,
                    const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
+                   const eigen_alloc_vector<Mat33_t> bearings_jac, const eigen_alloc_vector<nullspace32_t> bearings_nullspace,
                    const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
                    const unsigned int num_scale_levels, const float scale_factor,
                    bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db)
@@ -55,6 +57,7 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
       camera_(camera), depth_thr_(depth_thr),
       // constant observations
       num_keypts_(num_keypts), keypts_(keypts), undist_keypts_(undist_keypts), bearings_(bearings),
+      bearings_jac_(bearings_jac), bearings_nullspace_(bearings_nullspace),
       keypt_indices_in_cells_(assign_keypoints_to_grid(camera, undist_keypts)),
       stereo_x_right_(stereo_x_right), depths_(depths), descriptors_(descriptors.clone()),
       // graph node (connections is not assigned yet)
@@ -151,6 +154,12 @@ void keyframe::set_cam_pose(const Mat44_t& cam_pose_cw) {
 
 void keyframe::set_cam_pose(const g2o::SE3Quat& cam_pose_cw) {
     set_cam_pose(util::converter::to_eigen_mat(cam_pose_cw));
+}
+
+void keyframe::set_cam_pose_min(const Vec6_t& cam_pose_cw_min) {
+    Mat44_t cam_pose_cw;
+    optimize::g2o::se3::vec_6_to_world_to_cam(cam_pose_cw_min, cam_pose_cw);
+    set_cam_pose(cam_pose_cw);
 }
 
 Mat44_t keyframe::get_cam_pose() const {

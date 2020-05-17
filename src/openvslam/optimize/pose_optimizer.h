@@ -1,6 +1,9 @@
 #ifndef OPENVSLAM_OPTIMIZE_POSE_OPTIMIZER_H
 #define OPENVSLAM_OPTIMIZE_POSE_OPTIMIZER_H
 
+#include "g2o/core/base_unary_edge.h"
+#include "g2o/core/base_binary_edge.h"
+
 namespace openvslam {
 
 namespace data {
@@ -8,6 +11,7 @@ class frame;
 }
 
 namespace optimize {
+
 
 class pose_optimizer {
 public:
