@@ -5,6 +5,7 @@
 #include "openvslam/camera/base.h"
 #include "openvslam/data/graph_node.h"
 #include "openvslam/data/bow_vocabulary.h"
+#include "openvslam/gps/data.h"
 
 #include <set>
 #include <mutex>
@@ -60,7 +61,7 @@ public:
              const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
              const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
              const unsigned int num_scale_levels, const float scale_factor,
-             bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db);
+             bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db, const gps::data gps_data = gps::data());
 
     /**
      * Encode this keyframe information as JSON
@@ -169,6 +170,10 @@ public:
      */
     float compute_median_depth(const bool abs = false) const;
 
+    /**
+      * Get GPS data
+      */
+    gps::data get_gps_data();
     //-----------------------------------------
     // flags
 
@@ -305,6 +310,9 @@ private:
     mutable std::mutex mtx_observations_;
     //! observed landmarks
     std::vector<landmark*> landmarks_;
+
+    //! gps measurement
+    gps::data gps_data_;
 
     //-----------------------------------------
     // databases

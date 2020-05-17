@@ -130,6 +130,9 @@ private:
     //! Extract the new connections which will be created AFTER loop correction
     std::map<data::keyframe*, std::set<data::keyframe*>> extract_new_connections(const std::vector<data::keyframe*>& covisibilities) const;
 
+    //! perform pose graph optimization using gps priors
+    void align_to_gps_priors();
+
     //-----------------------------------------
     // management for reset process
 

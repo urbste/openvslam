@@ -3,12 +3,18 @@
 
 #include "openvslam/type.h"
 #include "openvslam/camera/base.h"
+#include "openvslam/gps/data.h"
 
 #include <opencv2/core.hpp>
 #include <nlohmann/json_fwd.hpp>
 
 namespace openvslam {
 namespace data {
+
+
+nlohmann::json convert_gps_data_to_json(gps::data& gps_data);
+
+gps::data convert_json_to_gps_data(const nlohmann::json& gps_data);
 
 nlohmann::json convert_rotation_to_json(const Mat33_t& rot_cw);
 

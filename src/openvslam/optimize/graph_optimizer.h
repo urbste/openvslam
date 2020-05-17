@@ -42,6 +42,8 @@ public:
                   const module::keyframe_Sim3_pairs_t& pre_corrected_Sim3s,
                   const std::map<data::keyframe*, std::set<data::keyframe*>>& loop_connections) const;
 
+    void optimize_gps_prior();
+
 private:
     //! map database
     const data::map_database* map_db_;

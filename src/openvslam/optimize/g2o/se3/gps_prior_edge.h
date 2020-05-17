@@ -4,7 +4,7 @@
 // implemented by Steffen Urban March 2020 (urbste@googlemail.com)
 // see also discussion here: https://github.com/introlab/rtabmap/issues/345
 #include "openvslam/type.h"
-
+#include "openvslam/optimize/g2o/se3/shot_vertex.h"
 #include <g2o/core/base_vertex.h>
 #include <g2o/types/slam3d/vertex_se3.h>
 #include <g2o/core/base_unary_edge.h>
@@ -15,7 +15,7 @@ namespace optimize {
 namespace g2o {
 namespace se3 {
 
-class gps_prior_edge final : public ::g2o::BaseUnaryEdge<3, Vec3_t, ::g2o::VertexSE3> {
+class gps_prior_edge final : public ::g2o::BaseUnaryEdge<3, Vec3_t, shot_vertex> {
 
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -43,10 +43,10 @@ class gps_prior_edge final : public ::g2o::BaseUnaryEdge<3, Vec3_t, ::g2o::Verte
       virtual bool write(std::ostream& os) const;
       virtual void computeError();
       virtual void linearizeOplus(); // maybe remove that guy?
-      virtual bool setMeasurementFromState();
+      //virtual bool setMeasurementFromState();
 
-      virtual double initialEstimatePossible(const ::g2o::OptimizableGraph::VertexSet& /*from*/, ::g2o::OptimizableGraph::Vertex* /*to*/) {return 1.;}
-      virtual void initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/, ::g2o::OptimizableGraph::Vertex* /*to_*/);
+      //virtual double initialEstimatePossible(const ::g2o::OptimizableGraph::VertexSet& /*from*/, ::g2o::OptimizableGraph::Vertex* /*to*/) {return 1.;}
+      //virtual void initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/, ::g2o::OptimizableGraph::Vertex* /*to_*/);
 
       const ::g2o::ParameterSE3Offset* offsetParameter() { return _offsetParam; }
 

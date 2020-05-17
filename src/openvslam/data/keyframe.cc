@@ -36,7 +36,7 @@ keyframe::keyframe(const frame& frm, map_database* map_db, bow_database* bow_db)
       log_scale_factor_(frm.log_scale_factor_), scale_factors_(frm.scale_factors_),
       level_sigma_sq_(frm.level_sigma_sq_), inv_level_sigma_sq_(frm.inv_level_sigma_sq_),
       // observations
-      landmarks_(frm.landmarks_),
+      landmarks_(frm.landmarks_), gps_data_(frm.gps_data_),
       // databases
       map_db_(map_db), bow_db_(bow_db), bow_vocab_(frm.bow_vocab_) {
     // set pose parameters (cam_pose_wc_, cam_center_) using frm.cam_pose_cw_
@@ -49,7 +49,7 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
                    const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
                    const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
                    const unsigned int num_scale_levels, const float scale_factor,
-                   bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db)
+                   bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db, const gps::data gps_data)
     : // meta information
       id_(id), src_frm_id_(src_frm_id), timestamp_(timestamp),
       // camera parameters
@@ -66,7 +66,7 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
       level_sigma_sq_(feature::orb_params::calc_level_sigma_sq(num_scale_levels, scale_factor)),
       inv_level_sigma_sq_(feature::orb_params::calc_inv_level_sigma_sq(num_scale_levels, scale_factor)),
       // others
-      landmarks_(std::vector<landmark*>(num_keypts, nullptr)),
+      landmarks_(std::vector<landmark*>(num_keypts, nullptr)), gps_data_(gps_data),
       // databases
       map_db_(map_db), bow_db_(bow_db), bow_vocab_(bow_vocab) {
     // compute BoW (bow_vec_, bow_feat_vec_) using descriptors_
@@ -274,6 +274,10 @@ landmark* keyframe::get_landmark(const unsigned int idx) const {
 
 std::vector<unsigned int> keyframe::get_keypoints_in_cell(const float ref_x, const float ref_y, const float margin) const {
     return data::get_keypoints_in_cell(camera_, undist_keypts_, keypt_indices_in_cells_, ref_x, ref_y, margin);
+}
+
+gps::data keyframe::get_gps_data() {
+    return gps_data_;
 }
 
 Vec3_t keyframe::triangulate_stereo(const unsigned int idx) const {

@@ -10,7 +10,7 @@ class data {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     //! default constructor
-    data() {}
+    data() : fix_(0) {}
     //! Constructor for scalar inputs
     data(const double latitude, const double longitude, const double height,
          const double dop_precision, const int fix, const int speed_2d, const int speed_3d,

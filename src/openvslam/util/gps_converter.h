@@ -47,4 +47,4 @@ public:
 
 } // namespace util
 } // namespace openvslam
-#endif OPENVSLAM_UTIL_GPS_CONVERTER_H
+#endif

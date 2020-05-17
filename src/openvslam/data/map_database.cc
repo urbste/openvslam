@@ -253,10 +253,13 @@ void map_database::register_keyframe(camera_database* cam_db, bow_vocabulary* bo
     const auto num_scale_levels = json_keyfrm.at("n_scale_levels").get<unsigned int>();
     const auto scale_factor = json_keyfrm.at("scale_factor").get<float>();
 
+    // gps data
+    const auto gps_data = convert_json_to_gps_data(json_keyfrm.at("gps_data"));
+
     // Construct a new object
     auto keyfrm = new data::keyframe(id, src_frm_id, timestamp, cam_pose_cw, camera, depth_thr,
                                      num_keypts, keypts, undist_keypts, bearings, stereo_x_right, depths, descriptors,
-                                     num_scale_levels, scale_factor, bow_vocab, bow_db, this);
+                                     num_scale_levels, scale_factor, bow_vocab, bow_db, this, gps_data);
 
     // Append to map database
     assert(!keyframes_.count(id));

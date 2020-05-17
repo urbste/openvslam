@@ -5,6 +5,23 @@
 namespace openvslam {
 namespace data {
 
+nlohmann::json convert_gps_data_to_json(gps::data& gps_data) {
+    return {gps_data.llh_[0], gps_data.llh_[1],gps_data.llh_[2], gps_data.dop_precision_, gps_data.fix_,
+        gps_data.speed_2d_, gps_data.speed_3d_, gps_data.ts_};
+}
+
+gps::data convert_json_to_gps_data(const nlohmann::json& gps_data) {
+    std::vector<double> data = gps_data.get<std::vector<double>>();
+    return gps::data(data.at(0),
+                   data.at(1),
+                   data.at(2),
+                   data.at(3),
+                   data.at(4),
+                   data.at(5),
+                   data.at(6),
+                   data.at(7));
+}
+
 nlohmann::json convert_rotation_to_json(const Mat33_t& rot_cw) {
     const Quat_t quat_cw(rot_cw);
     return {quat_cw.x(), quat_cw.y(), quat_cw.z(), quat_cw.w()};

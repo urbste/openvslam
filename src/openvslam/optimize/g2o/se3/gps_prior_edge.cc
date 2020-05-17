@@ -9,7 +9,7 @@ namespace g2o {
 namespace se3 {
 
 
-gps_prior_edge::gps_prior_edge() : ::g2o::BaseUnaryEdge<3, Vec3_t, ::g2o::VertexSE3>()
+gps_prior_edge::gps_prior_edge() : ::g2o::BaseUnaryEdge<3, Vec3_t, shot_vertex>()
 {
   information().setIdentity();
   setMeasurement(Vec3_t::Zero());
@@ -64,31 +64,32 @@ bool gps_prior_edge::write(std::ostream& os) const {
 }
 
 void gps_prior_edge::computeError() {
-  const ::g2o::VertexSE3* v = static_cast<const ::g2o::VertexSE3*>(_vertices[0]);
-  _error = v->estimate().translation() - _measurement;
+  const shot_vertex* v = static_cast<const shot_vertex*>(_vertices[0]);
+  const Vec3_t cam_center = -v->estimate().rotation().toRotationMatrix()*v->estimate().translation();
+  _error = cam_center - _measurement;
 }
 
-bool gps_prior_edge::setMeasurementFromState() {
-  const ::g2o::VertexSE3* v = static_cast<const ::g2o::VertexSE3*>(_vertices[0]);
-  _measurement = v->estimate().translation();
-  return true;
-}
+//bool gps_prior_edge::setMeasurementFromState() {
+//  const shot_vertex* v = static_cast<const shot_vertex*>(_vertices[0]);
+//  _measurement = v->estimate().translation();
+//  return true;
+//}
 
 void gps_prior_edge::linearizeOplus() {
    _jacobianOplusXi << Mat33_t::Identity();
  }
 
-void gps_prior_edge::initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/,
-                                     ::g2o::OptimizableGraph::Vertex* /*to_*/) {
-    ::g2o::VertexSE3 *v = static_cast<::g2o::VertexSE3*>(_vertices[0]);
-    assert(v && "Vertex for the Prior edge is not set");
+//void gps_prior_edge::initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/,
+//                                     ::g2o::OptimizableGraph::Vertex* /*to_*/) {
+//    shot_vertex *v = static_cast<shot_vertex*>(_vertices[0]);
+//    assert(v && "Vertex for the Prior edge is not set");
 
-    ::g2o::Isometry3 newEstimate = _offsetParam->offset().inverse() * Eigen::Translation3d(measurement());
-    if (_information.block<3,3>(0,0).array().abs().sum() == 0){ // do not set translation, as that part of the information is all zero
-      newEstimate.translation() = v->estimate().translation();
-    }
-    v->setEstimate(newEstimate);
-}
+//    ::g2o::Isometry3 newEstimate = _offsetParam->offset().inverse() * Eigen::Translation3d(measurement());
+//    if (_information.block<3,3>(0,0).array().abs().sum() == 0){ // do not set translation, as that part of the information is all zero
+//      newEstimate.translation() = v->estimate().translation();
+//    }
+//    v->setEstimate(newEstimate.);
+//}
 
 } // namespace se3
 } // namespace g2o

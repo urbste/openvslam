@@ -99,6 +99,10 @@ void global_optimization_module::run() {
         // pass the current keyframe to the loop detector
         loop_detector_->set_current_keyframe(cur_keyfrm_);
 
+        if (cur_keyfrm_->id_ > 400) {
+            align_to_gps_priors();
+        }
+
         // detect some loop candidate with BoW
         if (!loop_detector_->detect_loop_candidates()) {
             // could not find
@@ -116,6 +120,7 @@ void global_optimization_module::run() {
         }
 
         correct_loop();
+
     }
 
     spdlog::info("terminate global optimization module");
@@ -131,6 +136,27 @@ void global_optimization_module::queue_keyframe(data::keyframe* keyfrm) {
 bool global_optimization_module::keyframe_is_queued() const {
     std::lock_guard<std::mutex> lock(mtx_keyfrm_queue_);
     return (!keyfrms_queue_.empty());
+}
+
+void global_optimization_module::align_to_gps_priors() {
+    spdlog::info("Aligning to GPS measurements");
+    // pause the mapping module
+    mapper_->request_pause();
+    // abort the previous loop bundle adjuster
+    if (thread_for_loop_BA_ || loop_bundle_adjuster_->is_running()) {
+        abort_loop_BA();
+    }
+    // wait till the mapping module pauses
+    while (!mapper_->is_paused()) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+
+    cur_keyfrm_->graph_node_->update_connections();
+
+    graph_optimizer_->optimize_gps_prior();
+
+    // resume the mapping module
+    mapper_->resume();
 }
 
 void global_optimization_module::correct_loop() {
