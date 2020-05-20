@@ -132,7 +132,8 @@ void system::shutdown() {
     // wait until they stop
     while (!mapper_->is_terminated()
            || !global_optimizer_->is_terminated()
-           || global_optimizer_->loop_BA_is_running()) {
+           || global_optimizer_->loop_BA_is_running()
+           || global_optimizer_->gps_initializer_is_running()) {
         std::this_thread::sleep_for(std::chrono::microseconds(5000));
     }
 

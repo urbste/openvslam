@@ -130,13 +130,13 @@ void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, boo
         optimizer.addVertex(keyfrm_vtx);
 
 
-        // add gps prios to test
-        auto gps_edge = new g2o::se3::gps_prior_edge();
-        gps_edge->setMeasurement(local_keyfrm->get_gps_data().xyz_);
-        gps_edge->setInformation(Mat33_t::Identity() * (1./local_keyfrm->get_gps_data().dop_precision_));
-        gps_edge->setVertex(0, keyfrm_vtx);
-        gps_edge->setParameterId(0,0);
-        optimizer.addEdge(gps_edge);
+//        // add gps prios to test
+//        auto gps_edge = new g2o::se3::gps_prior_edge();
+//        gps_edge->setMeasurement(local_keyfrm->get_gps_data().xyz_);
+//        gps_edge->setInformation(Mat33_t::Identity() * (1./local_keyfrm->get_gps_data().dop_precision_));
+//        gps_edge->setVertex(0, keyfrm_vtx);
+//        gps_edge->setParameterId(0,0);
+//        optimizer.addEdge(gps_edge);
     }
 
     // fixed keyframesをoptimizerにセット

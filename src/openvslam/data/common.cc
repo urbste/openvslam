@@ -1,5 +1,5 @@
 #include "openvslam/data/common.h"
-
+#include "openvslam/gps/data.h"
 #include <nlohmann/json.hpp>
 
 namespace openvslam {
@@ -16,7 +16,7 @@ gps::data convert_json_to_gps_data(const nlohmann::json& gps_data) {
                    data.at(1),
                    data.at(2),
                    data.at(3),
-                   data.at(4),
+                   static_cast<gps::gps_fix_state_t>(data.at(4)),
                    data.at(5),
                    data.at(6),
                    data.at(7));

@@ -6,18 +6,25 @@
 namespace openvslam {
 namespace gps {
 
+enum gps_fix_state_t {
+    NO_FIX = 0,
+    FIX_2D = 2,
+    FIX_3D = 3
+};
+
+
 class data {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     //! default constructor
-    data() : fix_(0) {}
+    data() : fix_(gps_fix_state_t::NO_FIX) {}
     //! Constructor for scalar inputs
     data(const double latitude, const double longitude, const double height,
-         const double dop_precision, const int fix, const int speed_2d, const int speed_3d,
+         const double dop_precision, const gps_fix_state_t fix, const int speed_2d, const int speed_3d,
          const double ts);
 
     //! Constructor for vector inputs
-    data(const Vec3_t& llh, const double dop_precision, const int fix,
+    data(const Vec3_t& llh, const double dop_precision, const gps_fix_state_t fix,
          const double speed_2d, const double speed_3d, const double ts);
 
     //! Set XYZ data
@@ -34,7 +41,7 @@ public:
     //! 3D speed
     double speed_3d_;
     //! fix -> 0: no fix, 1: 2D fix, 2: 3D fix
-    int fix_;
+    gps::gps_fix_state_t fix_;
     //! timestamp [s]
     double ts_;
 };

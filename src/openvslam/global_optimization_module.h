@@ -6,6 +6,7 @@
 #include "openvslam/module/type.h"
 #include "openvslam/module/loop_detector.h"
 #include "openvslam/module/loop_bundle_adjuster.h"
+#include "openvslam/module/gps_initializer.h"
 #include "openvslam/optimize/graph_optimizer.h"
 
 #include <list>
@@ -49,6 +50,17 @@ public:
 
     //! The loop detector is enabled or not
     bool loop_detector_is_enabled() const;
+
+    //-----------------------------------------
+    // interfaces to ON/OFF gps
+    //! Enable the loop detector
+    void enable_gps();
+
+    //! Disable the loop detector
+    void disable_gps();
+
+    //! The loop detector is enabled or not
+    bool gps_is_enabled() const;
 
     //-----------------------------------------
     // main process
@@ -101,7 +113,15 @@ public:
     //! Abort the loop BA externally
     //! (NOTE: this function does not wait for abort)
     void abort_loop_BA();
+    //-----------------------------------------
+    // management for gps initializer
 
+    //! Check if loop BA is running or not
+    bool gps_initializer_is_running() const;
+
+    //! Abort the loop BA externally
+    //! (NOTE: this function does not wait for abort)
+    void abort_gps_initializer();
 private:
     //-----------------------------------------
     // main process
@@ -191,6 +211,8 @@ private:
     std::unique_ptr<module::loop_detector> loop_detector_ = nullptr;
     //! loop bundle adjuster
     std::unique_ptr<module::loop_bundle_adjuster> loop_bundle_adjuster_ = nullptr;
+    //! gps initializer
+    std::unique_ptr<module::gps_initializer> gps_initializer_ = nullptr;
 
     //-----------------------------------------
     // keyframe queue

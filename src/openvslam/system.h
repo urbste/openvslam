@@ -100,6 +100,15 @@ public:
     //! Abort the loop BA externally
     void abort_loop_BA();
 
+    //! Enable GPS
+    void enable_gps_initializer();
+
+    //! Disable gps initializer
+    void disable_gps_initializer();
+
+    //! Is gps initializer active
+    bool is_gps_initializer_enabled();
+
     //-----------------------------------------
     // data feeding methods
 

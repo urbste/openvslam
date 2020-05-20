@@ -26,7 +26,8 @@ public:
     std::array<float, 3> lm_{};
     //! local_landmark color
     std::array<float, 3> local_lm_{};
-
+    //! local_landmark color
+    std::array<float, 3> gps_xyz_{};
 private:
     void set_color_as_white();
 
