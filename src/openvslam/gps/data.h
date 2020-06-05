@@ -34,6 +34,8 @@ public:
     Vec3_t llh_;
     //! gps measurement in x y z ellipsoid coordinates
     Vec3_t xyz_;
+    //! scaled gps measurement in x y z ellipsoid coordinates for better numerical stability and plotting
+    Vec3_t scaled_xyz_;
     //! dilusion of precision
     double dop_precision_;
     //! 2D speed

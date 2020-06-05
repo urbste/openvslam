@@ -15,7 +15,9 @@ global_optimization_module::global_optimization_module(data::map_database* map_d
     : loop_detector_(new module::loop_detector(bow_db, bow_vocab, fix_scale)),
       loop_bundle_adjuster_(new module::loop_bundle_adjuster(map_db)),
       gps_initializer_(new module::gps_initializer(map_db)),
-      graph_optimizer_(new optimize::graph_optimizer(map_db, fix_scale)) {
+      graph_optimizer_(new optimize::graph_optimizer(map_db, fix_scale)),
+      global_gps_optimizer_(new optimize::global_gps_bundle_adjuster(map_db))
+{
     spdlog::debug("CONSTRUCT: global_optimization_module");
 }
 
@@ -115,7 +117,7 @@ void global_optimization_module::run() {
         // pass the current keyframe to the loop detector
         loop_detector_->set_current_keyframe(cur_keyfrm_);
 
-        if (cur_keyfrm_->id_ > 20) {
+        if (cur_keyfrm_->id_ > 10) {
             align_to_gps_priors();
         }
 
@@ -155,7 +157,20 @@ bool global_optimization_module::keyframe_is_queued() const {
 }
 
 void global_optimization_module::align_to_gps_priors() {
-    spdlog::info("Aligning to GPS measurements");
+    if (!GPS_is_initialized_) {
+        spdlog::info("Aligning to GPS measurements");
+    }
+    if (gps_initializer_->start_map_scale_initalization()) {
+        if (gps_initializer_->start_map_rotation_initalization()) {
+            run_global_GPS_optim_ = true;
+            GPS_is_initialized_ = true;
+        }
+    }
+}
+
+void global_optimization_module::run_global_GPS_optim() {
+
+    // stop
     // pause the mapping module
     mapper_->request_pause();
     // abort the previous loop bundle adjuster
@@ -167,15 +182,10 @@ void global_optimization_module::align_to_gps_priors() {
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
 
-    // initialize
-    if (gps_initializer_->start_map_scale_initalization()) {
-        if (gps_initializer_->start_map_rotation_initalization()) {
-            //cur_keyfrm_->graph_node_->update_connections();
-            //graph_optimizer_->optimize_gps_prior();
-        }
+    if (GPS_is_initialized_) {
+        global_gps_optimizer_->optimize(0);
     }
 
-    // resume the mapping module
     mapper_->resume();
 }
 
@@ -528,6 +538,14 @@ void global_optimization_module::terminate() {
 
 bool global_optimization_module::loop_BA_is_running() const {
     return loop_bundle_adjuster_->is_running();
+}
+
+bool global_optimization_module::gps_optim_is_running() const {
+    return global_gps_optimizer_->is_running();
+}
+
+bool global_optimization_module::is_gps_initialized() const {
+    return GPS_is_initialized_;
 }
 
 void global_optimization_module::abort_loop_BA() {

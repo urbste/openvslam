@@ -1,6 +1,7 @@
 #include "openvslam/data/keyframe.h"
 #include "openvslam/data/map_database.h"
 #include "openvslam/io/trajectory_io.h"
+#include "openvslam/util/gps_converter.h"
 
 #include <iostream>
 #include <iomanip>
@@ -40,6 +41,7 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
         spdlog::critical("cannot create a file at {}", path);
         throw std::runtime_error("cannot create a file at " + path);
     }
+    nlohmann::json json_output;
 
     spdlog::info("dump frame trajectory in \"{}\" format from frame {} to frame {} ({} frames)",
                  format, reference_keyframes.begin()->first, reference_keyframes.rbegin()->first, num_valid_frms);
@@ -69,13 +71,15 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
             spdlog::warn("frame(s) from {} to {} was/were skipped", prev_frm_id + 1, frm_id - 1);
             offset = frm_id - i;
         }
-
         auto ref_keyfrm = rk_itr->second;
         const Mat44_t cam_pose_rw = ref_keyfrm->get_cam_pose();
         const Mat44_t rel_cam_pose_cr = rc_itr->second;
 
         const Mat44_t cam_pose_cw = rel_cam_pose_cr * cam_pose_rw;
         const Mat44_t cam_pose_wc = cam_pose_cw.inverse();
+
+        const std::string framename = "frame_"+std::to_string(i);
+        json_output[framename]["timestamp"] = timestamps.at(frm_id);
 
         if (format == "KITTI") {
             ofs << std::setprecision(9)
@@ -93,6 +97,26 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
                 << trans_wc(0) << " " << trans_wc(1) << " " << trans_wc(2) << " "
                 << quat_wc.x() << " " << quat_wc.y() << " " << quat_wc.z() << " " << quat_wc.w() << std::endl;
         }
+        else if (format == "GoProGPS") {
+            const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
+            const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
+            Vec3_t llh;
+            util::gps_converter::ECEFToLLA_new(trans_wc * gps_scaler, llh);
+            const Quat_t quat_wc = Quat_t(rot_wc);
+
+            json_output[framename]["quaternion_wc"]["w"] = quat_wc.w();
+            json_output[framename]["quaternion_wc"]["x"] = quat_wc.x();
+            json_output[framename]["quaternion_wc"]["y"] = quat_wc.y();
+            json_output[framename]["quaternion_wc"]["z"] = quat_wc.z();
+
+            json_output[framename]["latitude"] = llh(0);
+            json_output[framename]["longitude"] = llh(1);
+            json_output[framename]["height"] = llh(2);
+
+            json_output[framename]["position_wc"]["x"] = trans_wc(0);
+            json_output[framename]["position_wc"]["y"] = trans_wc(1);
+            json_output[framename]["position_wc"]["z"] = trans_wc(2);
+        }
         else {
             throw std::runtime_error("Not implemented: trajectory format \"" + format + "\"");
         }
@@ -104,6 +128,9 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
         spdlog::error("the sizes of frame statistics are not matched");
     }
 
+    if (format == "GoProGPS") {
+        ofs << json_output;
+    }
     ofs.close();
 }
 
@@ -130,14 +157,22 @@ void trajectory_io::save_keyframe_trajectory(const std::string& path, const std:
         spdlog::critical("cannot create a file at {}", path);
         throw std::runtime_error("cannot create a file at " + path);
     }
-
+    nlohmann::json json_output;
     spdlog::info("dump keyframe trajectory in \"{}\" format from keyframe {} to keyframe {} ({} keyframes)",
                  format, (*keyfrms.begin())->id_, (*keyfrms.rbegin())->id_, keyfrms.size());
 
-    for (const auto keyfrm : keyfrms) {
-        const Mat44_t cam_pose_cw = keyfrm->get_cam_pose();
+    // sort keyframes according to id
+    std::map<unsigned int, data::keyframe*> sorted_kfs;
+    for (auto kf : keyfrms) {
+        sorted_kfs.insert(std::pair<double, data::keyframe*>(kf->timestamp_, kf));
+    }
+
+    for (const auto keyfrm : sorted_kfs) {
+        const Mat44_t cam_pose_cw = keyfrm.second->get_cam_pose();
         const Mat44_t cam_pose_wc = cam_pose_cw.inverse();
-        const auto timestamp = keyfrm->timestamp_;
+        const auto timestamp = keyfrm.second->timestamp_;
+        const std::string framename = "keyframe_" + std::to_string(keyfrm.second->id_);
+        json_output[framename]["timestamp"] = timestamp;
 
         if (format == "KITTI") {
             ofs << std::setprecision(9)
@@ -155,11 +190,34 @@ void trajectory_io::save_keyframe_trajectory(const std::string& path, const std:
                 << trans_wc(0) << " " << trans_wc(1) << " " << trans_wc(2) << " "
                 << quat_wc.x() << " " << quat_wc.y() << " " << quat_wc.z() << " " << quat_wc.w() << std::endl;
         }
+        else if (format == "GoProGPS") {
+            const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
+            const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
+            Vec3_t llh;
+            util::gps_converter::ECEFToLLA_new(trans_wc * gps_scaler, llh);
+            const Quat_t quat_wc = Quat_t(rot_wc);
+
+            json_output[framename]["quaternion_wc"]["w"] = quat_wc.w();
+            json_output[framename]["quaternion_wc"]["x"] = quat_wc.x();
+            json_output[framename]["quaternion_wc"]["y"] = quat_wc.y();
+            json_output[framename]["quaternion_wc"]["z"] = quat_wc.z();
+
+            json_output[framename]["latitude"] = llh(0);
+            json_output[framename]["longitude"] = llh(1);
+            json_output[framename]["height"] = llh(2);
+
+            json_output[framename]["position_wc"]["x"] = trans_wc(0);
+            json_output[framename]["position_wc"]["y"] = trans_wc(1);
+            json_output[framename]["position_wc"]["z"] = trans_wc(2);
+        }
         else {
             throw std::runtime_error("Not implemented: trajectory format \"" + format + "\"");
         }
     }
 
+    if (format == "GoProGPS") {
+        ofs << json_output;
+    }
     ofs.close();
 }
 

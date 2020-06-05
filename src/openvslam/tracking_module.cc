@@ -90,8 +90,6 @@ Mat44_t tracking_module::track_monocular_image(const cv::Mat& img, const double 
     }
 
     if (system_->is_gps_data_used()) {
-        // enable gps if it comes with the data
-        global_optimizer_->enable_gps();
         // get current gps readings and assign to frame
         auto it = gps_data_map_.find(timestamp);
         // check if we have a gps reading at that timestamp, if yes insert it

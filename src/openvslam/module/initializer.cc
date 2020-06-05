@@ -172,16 +172,23 @@ bool initializer::create_map_for_monocular(data::frame& curr_frm) {
             init_matches_.at(i) = -1;
         }
 
+//        // set the camera poses
+//        Mat44_t init_pose = Mat44_t::Identity();
+//        init_pose.block<3,1>(0,3) = -init_pose.block<3,3>(0,0)*init_frm_.gps_data_.xyz_;
+//        init_frm_.set_cam_pose(init_pose);
+//        Mat44_t cam_pose_wc = Mat44_t::Identity();
+//        cam_pose_wc.block<3, 3>(0, 0) = initializer_->get_rotation_ref_to_cur().transpose();
+//        cam_pose_wc.block<3, 1>(0, 3) = init_frm_.gps_data_.xyz_ - initializer_->get_rotation_ref_to_cur()*initializer_->get_translation_ref_to_cur();
+//        curr_frm.set_cam_pose(cam_pose_wc.inverse());
+//        std::cout<<"init_frame: "<<init_frm_.get_cam_center()<<std::endl;
+//        std::cout<<"cur_frame: "<<curr_frm.get_cam_center()<<std::endl;
+
         // set the camera poses
-        Mat44_t init_pose = Mat44_t::Identity();
-        init_pose.block<3,1>(0,3) = -init_pose.block<3,3>(0,0)*init_frm_.gps_data_.xyz_;
-        init_frm_.set_cam_pose(init_pose);
-        Mat44_t cam_pose_wc = Mat44_t::Identity();
-        cam_pose_wc.block<3, 3>(0, 0) = initializer_->get_rotation_ref_to_cur().transpose();
-        cam_pose_wc.block<3, 1>(0, 3) = init_frm_.gps_data_.xyz_ - initializer_->get_rotation_ref_to_cur()*initializer_->get_translation_ref_to_cur();
-        curr_frm.set_cam_pose(cam_pose_wc.inverse());
-        std::cout<<"init_frame: "<<init_frm_.get_cam_center()<<std::endl;
-        std::cout<<"cur_frame: "<<curr_frm.get_cam_center()<<std::endl;
+        init_frm_.set_cam_pose(Mat44_t::Identity());
+        Mat44_t cam_pose_cw = Mat44_t::Identity();
+        cam_pose_cw.block<3, 3>(0, 0) = initializer_->get_rotation_ref_to_cur();
+        cam_pose_cw.block<3, 1>(0, 3) = initializer_->get_translation_ref_to_cur();
+        curr_frm.set_cam_pose(cam_pose_cw);
 
         // destruct the initializer
         initializer_.reset(nullptr);
@@ -213,7 +220,8 @@ bool initializer::create_map_for_monocular(data::frame& curr_frm) {
         }
 
         // construct a landmark
-        auto lm = new data::landmark(init_triangulated_pts.at(init_idx)+init_frm_.gps_data_.xyz_, curr_keyfrm, map_db_);
+        //auto lm = new data::landmark(init_triangulated_pts.at(init_idx)+init_frm_.gps_data_.xyz_, curr_keyfrm, map_db_);
+        auto lm = new data::landmark(init_triangulated_pts.at(init_idx), curr_keyfrm, map_db_);
 
         // set the assocications to the new keyframes
         init_keyfrm->add_landmark(lm, init_idx);
@@ -238,15 +246,15 @@ bool initializer::create_map_for_monocular(data::frame& curr_frm) {
     const auto global_bundle_adjuster = optimize::global_bundle_adjuster(map_db_, num_ba_iters_, true);
     global_bundle_adjuster.optimize();
 
-//    // scale the map so that the median of depths is 1.0
-//    const auto median_depth = init_keyfrm->compute_median_depth(init_keyfrm->camera_->model_type_ == camera::model_type_t::Equirectangular);
-//    const auto inv_median_depth = 1.0 / median_depth;
-//    if (curr_keyfrm->get_num_tracked_landmarks(1) < min_num_triangulated_ && median_depth < 0) {
-//        spdlog::info("seems to be wrong initialization, resetting");
-//        state_ = initializer_state_t::Wrong;
-//        return false;
-//    }
-//    scale_map(init_keyfrm, curr_keyfrm, inv_median_depth * scaling_factor_);
+    // scale the map so that the median of depths is 1.0
+    const auto median_depth = init_keyfrm->compute_median_depth(init_keyfrm->camera_->model_type_ == camera::model_type_t::Equirectangular);
+    const auto inv_median_depth = 1.0 / median_depth;
+    if (curr_keyfrm->get_num_tracked_landmarks(1) < min_num_triangulated_ && median_depth < 0) {
+        spdlog::info("seems to be wrong initialization, resetting");
+        state_ = initializer_state_t::Wrong;
+        return false;
+    }
+    scale_map(init_keyfrm, curr_keyfrm, inv_median_depth * scaling_factor_);
 
     // update the current frame pose
     curr_frm.set_cam_pose(curr_keyfrm->get_cam_pose());

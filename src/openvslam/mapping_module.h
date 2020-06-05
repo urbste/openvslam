@@ -98,6 +98,11 @@ public:
     //! (NOTE: this function does not wait for abort)
     void abort_local_BA();
 
+    //!
+    void set_gps_initialized() { gps_initialized_ = true; }
+
+    //! is local ba running
+    bool is_local_ba_running() const;
 private:
     //-----------------------------------------
     // main process
@@ -222,6 +227,14 @@ private:
 
     //! current keyframe which is used in the current mapping
     data::keyframe* cur_keyfrm_ = nullptr;
+
+    //! is gps initialized
+    bool gps_initialized_ = false;
+
+    //! mutex for access to reset procedure
+    mutable std::mutex mtx_run_flag_;
+    //! flag to indicate if local ba is running
+    bool local_ba_is_running_ = false;
 };
 
 } // namespace openvslam

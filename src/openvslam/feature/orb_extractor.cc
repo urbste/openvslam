@@ -131,7 +131,7 @@ void orb_extractor::extract(const cv::_InputArray& in_image, const cv::_InputArr
 
         cv::Mat blurred_image = image_pyramid_.at(level).clone();
         cv::GaussianBlur(blurred_image, blurred_image, cv::Size(7, 7), 2, 2, cv::BORDER_REFLECT_101);
-
+        //cv::boxFilter(blurred_image, blurred_image, blurred_image.depth(), cv::Size(5,5), cv::Point(-1,-1), true, cv::BORDER_REFLECT_101);
         cv::Mat descriptors_at_level = descriptors.rowRange(offset, offset + num_keypts_at_level);
         compute_orb_descriptors(blurred_image, keypts_at_level, descriptors_at_level);
 

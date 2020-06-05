@@ -160,7 +160,17 @@ void mapping_module::mapping_with_new_keyframe() {
     // local bundle adjustment
     abort_local_BA_ = false;
     if (2 < map_db_->get_num_keyframes()) {
+        if (gps_initialized_)
+            local_bundle_adjuster_->set_gps_initialized();
+        {
+            std::lock_guard<std::mutex> lock(mtx_run_flag_);
+            local_ba_is_running_ = true;
+        }
         local_bundle_adjuster_->optimize(cur_keyfrm_, &abort_local_BA_);
+        {
+            std::lock_guard<std::mutex> lock(mtx_run_flag_);
+            local_ba_is_running_ = false;
+        }
     }
     local_map_cleaner_->remove_redundant_keyframes(cur_keyfrm_);
 }
@@ -511,6 +521,11 @@ void mapping_module::terminate() {
     std::lock_guard<std::mutex> lock2(mtx_terminate_);
     is_paused_ = true;
     is_terminated_ = true;
+}
+
+bool mapping_module::is_local_ba_running() const {
+    std::lock_guard<std::mutex> lock(mtx_run_flag_);
+    return local_ba_is_running_;
 }
 
 } // namespace openvslam

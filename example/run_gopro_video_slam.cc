@@ -34,7 +34,7 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                    const std::string& mask_img_path,
                    const std::string& telemetry_json_path,
                    const unsigned int frame_skip, const bool no_sleep, const bool auto_term,
-                   const bool eval_log, const std::string& map_db_path) {
+                   const bool eval_log, const bool disable_loop_detector, const std::string& map_db_path) {
     // load the mask image
     const cv::Mat mask = mask_img_path.empty() ? cv::Mat{} : cv::imread(mask_img_path, cv::IMREAD_GRAYSCALE);
 
@@ -43,6 +43,11 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
     // startup the SLAM process
     SLAM.startup();
 
+    // disable loop detector -> we are only moving forwards here
+    if (disable_loop_detector) {
+        spdlog::info("Loop detection is disabled.");
+        SLAM.disable_loop_detector();
+    }
     // load telemetry json if provided
     gopro_input_telemetry gopro_telemetry_data;
     if (telemetry_json_path != "") {
@@ -70,11 +75,13 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
 
     unsigned int num_frame = 0;
     unsigned int empty_frame = 0;
+    unsigned int num_kfs_last_global_optim = 0;
     bool is_not_end = true;
     // run the SLAM in another thread
     std::thread thread([&]() {
         while (is_not_end) {
             is_not_end = video.read(frame);
+            timestamp = video.get(cv::CAP_PROP_POS_MSEC)/1000.;
             // this is necessary as sometimes frames are missing from e.g. gopro videos
             // and the feed would crash
             if (!is_not_end) {
@@ -90,11 +97,11 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
             if (!frame.empty() && (num_frame % frame_skip == 0)) {
                 // downsample images from original video to calibrated values
                 // otherwise tracking on orginal FullHD or even bigger GoPro videos is way to slow
-                if (cfg->camera_->cols_ != frame.cols) {
+                if (cfg->camera_->cols_ != static_cast<unsigned int>(frame.cols)) {
                     cv::resize(frame, frame, cv::Size(cfg->camera_->cols_, cfg->camera_->rows_));
                 }
                 // get gps if available
-                gopro_telemetry_data.get_gps_data_at_time(timestamp,interpolated_gps_data);
+                gopro_telemetry_data.get_gps_data_at_time(timestamp, interpolated_gps_data);
                 if (SLAM.is_gps_data_used()) {
                     SLAM.feed_GPS_data(interpolated_gps_data);
                 }
@@ -117,12 +124,28 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                 }
             }
 
-            timestamp += 1.0 / cfg->camera_->fps_;
+            //timestamp += 1.0 / cfg->camera_->fps_;
             ++num_frame;
 
             // check if the termination of SLAM system is requested or not
             if (SLAM.terminate_is_requested()) {
                 break;
+            }
+
+            while (SLAM.is_local_ba_running()) {
+                std::this_thread::sleep_for(std::chrono::microseconds(5));
+            }
+            if (SLAM.is_gps_initialized()) {
+                const unsigned int cur_nr_kfs = SLAM.get_current_nr_kfs();
+                if ((cur_nr_kfs - num_kfs_last_global_optim) > 30) {
+                    num_kfs_last_global_optim = cur_nr_kfs;
+                    SLAM.request_global_GPS_optim();
+                    std::this_thread::sleep_for(std::chrono::microseconds(10));
+                }
+            }
+            // wait until the loop BA is finished
+            while (SLAM.global_GPS_optim_is_running()) {
+                std::this_thread::sleep_for(std::chrono::microseconds(250));
             }
         }
 
@@ -157,10 +180,10 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
 
     if (eval_log) {
         // output the trajectories for evaluation
-        SLAM.save_frame_trajectory("frame_trajectory.txt", "TUM");
-        SLAM.save_keyframe_trajectory("keyframe_trajectory.txt", "TUM");
+        SLAM.save_frame_trajectory(video_file_path+"_frame_trajectory.json", "GoProGPS");
+        SLAM.save_keyframe_trajectory(video_file_path+"_keyframe_trajectory.json", "GoProGPS");
         // output the tracking times for evaluation
-        std::ofstream ofs("track_times.txt", std::ios::out);
+        std::ofstream ofs(video_file_path+"_track_times.txt", std::ios::out);
         if (ofs.is_open()) {
             for (const auto track_time : track_times) {
                 ofs << track_time << std::endl;
@@ -200,6 +223,7 @@ int main(int argc, char* argv[]) {
     auto eval_log = op.add<popl::Switch>("", "eval-log", "store trajectory and tracking times for evaluation");
     auto map_db_path = op.add<popl::Value<std::string>>("p", "map-db", "store a map database at this path after SLAM", "");
     auto telemetry_json = op.add<popl::Value<std::string>>("t", "telemetry", "gopro telemetry json extracted using telemetry extactor.", "");
+    auto disable_loop = op.add<popl::Switch>("", "disable-loop", "disable loop detection");
 
     try {
         op.parse(argc, argv);
@@ -251,7 +275,7 @@ int main(int argc, char* argv[]) {
         mono_tracking(cfg, vocab_file_path->value(), video_file_path->value(), mask_img_path->value(),
                       telemetry_json->value(),
                       frame_skip->value(), no_sleep->is_set(), auto_term->is_set(),
-                      eval_log->is_set(), map_db_path->value());
+                      eval_log->is_set(), disable_loop->is_set(), map_db_path->value());
     }
     else {
         throw std::runtime_error("Invalid setup type: " + cfg->camera_->get_setup_type_string());

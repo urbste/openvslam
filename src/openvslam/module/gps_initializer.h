@@ -63,6 +63,12 @@ public:
     bool is_enabled() const;
 
     /**
+     * Get the loop detector status
+     */
+    bool is_map_scale_initialized() const;
+
+
+    /**
      * Set the mapping module
      */
     void set_mapping_module(mapping_module* mapper);
@@ -82,6 +88,7 @@ private:
     //! mapping module
     mapping_module* mapper_ = nullptr;
 
+    //! current state of gps initializer
     gps_initializer_state_t state_ = gps_initializer_state_t::NotReady;
 
     //! Scaling up or down a initial map
@@ -113,6 +120,15 @@ private:
 
     //! is enabled flag
     bool is_initializer_enabled_ = false;
+
+    //! map initialized
+    bool map_scale_initialized_ = false;
+
+    //! map initialized
+    bool map_alignment_initialized_ = false;
+
+    //! last initialized scale
+    double last_scale_estimate_ = 0.0;
 };
 
 } // namespace module

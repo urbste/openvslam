@@ -184,7 +184,8 @@ void viewer::draw_horizontal_grid() {
 }
 
 pangolin::OpenGlMatrix viewer::get_current_cam_pose() {
-    const auto cam_pose_cw = map_publisher_->get_current_cam_pose();
+    auto cam_pose_cw = map_publisher_->get_current_cam_pose();
+    cam_pose_cw.block<3,1>(0,3) /= 1.0;
     const pangolin::OpenGlMatrix gl_cam_pose_wc(cam_pose_cw.inverse().eval());
     return gl_cam_pose_wc;
 }
@@ -212,7 +213,9 @@ void viewer::draw_keyframes() {
             if (!keyfrm || keyfrm->will_be_erased()) {
                 continue;
             }
-            draw_camera(keyfrm->get_cam_pose_inv(), w);
+            openvslam::Mat44_t cam_pose_inv = keyfrm->get_cam_pose_inv();
+            cam_pose_inv.block<3,1>(0,3) /= 1.0;
+            draw_camera(cam_pose_inv, w);
         }
     }
     if (*menu_show_gps_data_) {
@@ -225,7 +228,8 @@ void viewer::draw_keyframes() {
             glColor3fv(cs_.gps_xyz_.data());
             glBegin(GL_POINTS);
 
-            const openvslam::Vec3_t pos_w = keyfrm->get_gps_data().xyz_;
+            openvslam::Vec3_t pos_w = keyfrm->get_gps_data().xyz_;
+            pos_w /= 1.0;
             glVertex3fv(pos_w.cast<float>().eval().data());
 
             glEnd();
@@ -247,8 +251,8 @@ void viewer::draw_keyframes() {
                 continue;
             }
 
-            const openvslam::Vec3_t cam_center_1 = keyfrm->get_cam_center();
-
+            openvslam::Vec3_t cam_center_1 = keyfrm->get_cam_center();
+            cam_center_1 /= 1.0;
             // covisibility graph
             const auto covisibilities = keyfrm->graph_node_->get_covisibilities_over_weight(100);
             if (!covisibilities.empty()) {
@@ -259,7 +263,8 @@ void viewer::draw_keyframes() {
                     if (covisibility->id_ < keyfrm->id_) {
                         continue;
                     }
-                    const openvslam::Vec3_t cam_center_2 = covisibility->get_cam_center();
+                    openvslam::Vec3_t cam_center_2 = covisibility->get_cam_center();
+                    cam_center_2 /= 1.0;
                     draw_edge(cam_center_1, cam_center_2);
                 }
             }
@@ -267,7 +272,8 @@ void viewer::draw_keyframes() {
             // spanning tree
             auto spanning_parent = keyfrm->graph_node_->get_spanning_parent();
             if (spanning_parent) {
-                const openvslam::Vec3_t cam_center_2 = spanning_parent->get_cam_center();
+                openvslam::Vec3_t cam_center_2 = spanning_parent->get_cam_center();
+                cam_center_2 /= 1.0;
                 draw_edge(cam_center_1, cam_center_2);
             }
 
@@ -280,7 +286,8 @@ void viewer::draw_keyframes() {
                 if (loop_edge->id_ < keyfrm->id_) {
                     continue;
                 }
-                const openvslam::Vec3_t cam_center_2 = loop_edge->get_cam_center();
+                openvslam::Vec3_t cam_center_2 = loop_edge->get_cam_center();
+                cam_center_2 /= 1.0;
                 draw_edge(cam_center_1, cam_center_2);
             }
         }
@@ -315,7 +322,8 @@ void viewer::draw_landmarks() {
         if (*menu_show_local_map_ && local_landmarks.count(lm)) {
             continue;
         }
-        const openvslam::Vec3_t pos_w = lm->get_pos_in_world();
+        openvslam::Vec3_t pos_w = lm->get_pos_in_world();
+        pos_w /= 1.0;
         glVertex3fv(pos_w.cast<float>().eval().data());
     }
 
@@ -334,7 +342,8 @@ void viewer::draw_landmarks() {
         if (local_lm->will_be_erased()) {
             continue;
         }
-        const openvslam::Vec3_t pos_w = local_lm->get_pos_in_world();
+        openvslam::Vec3_t pos_w = local_lm->get_pos_in_world();
+        pos_w /= 1.0;
         glVertex3fv(pos_w.cast<float>().eval().data());
     }
 

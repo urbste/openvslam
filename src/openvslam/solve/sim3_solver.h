@@ -14,6 +14,12 @@ class sim3_solver {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
+    //! Constructor to align keyframe to gps poses
+    sim3_solver(const eigen_alloc_vector<Vec3_t>& kf_poses,
+                const eigen_alloc_vector<Vec3_t>& gps_poses,
+                const bool fix_scale = true, const unsigned int min_num_inliers = 20,
+                const double chi2_sqrt = 1.0, const double lambda2 = 2.0);
+
     //! Constructor
     sim3_solver(data::keyframe* keyfrm_1, data::keyframe* keyfrm_2,
                 const std::vector<data::landmark*>& matched_lms_in_keyfrm_2,
@@ -24,6 +30,10 @@ public:
 
     //! Find the most reliable Sim3 matrix via RANSAC
     void find_via_ransac(const unsigned int max_num_iter);
+
+    //! Find the most reliable Sim3 matrix via RANSAC to align two point clouds
+    unsigned int find_pcl_alignment(const unsigned int max_num_iter,
+                                    const unsigned int min_set = 5);
 
     //! Check if the solution is valid or not
     bool solution_is_valid() const {
@@ -53,10 +63,21 @@ protected:
                       Mat33_t& rot_12, Vec3_t& trans_12, float& scale_12,
                       Mat33_t& rot_21, Vec3_t& trans_21, float& scale_21);
 
+    double compute_Sim3_Umeyama(const eigen_alloc_vector<Vec3_t>& pts_1,
+                              const eigen_alloc_vector<Vec3_t>& pts_2,
+                              const std::vector<double>& weights,
+                              Mat33_t& rot_12, Vec3_t& trans_12, float& scale_12,
+                              Mat33_t& rot_21, Vec3_t& trans_21, float& scale_21);
+
     //! count up inliers
     unsigned int count_inliers(const Mat33_t& rot_12, const Vec3_t& trans_12, const float scale_12,
                                const Mat33_t& rot_21, const Vec3_t& trans_21, const float scale_21,
                                std::vector<bool>& inliers);
+
+    //! count up inliers for pcl alignment
+    unsigned int count_inliers_pcl(const Mat33_t& rot_12, const Vec3_t& trans_12, const float scale_12,
+                                   const Mat33_t& rot_21, const Vec3_t& trans_21, const float scale_21,
+                                   std::vector<bool>& inliers);
 
     //! reproject points in camera (local) coordinates to the other image (as undistorted keypoints)
     void reproject_to_other_image(const std::vector<Vec3_t, Eigen::aligned_allocator<Vec3_t>>& lm_coords_in_cam_1,
@@ -105,6 +126,10 @@ protected:
 
     //! RANSACのパラメータ
     unsigned int min_num_inliers_;
+
+    //! lambda2 -> singular value indicating good x-y distribution
+    double min_lambda2_;
+
 };
 
 } // namespace solve

@@ -97,6 +97,9 @@ public:
     //! Loop BA is running or not
     bool loop_BA_is_running() const;
 
+    //! Global GPS optim is running
+    bool global_GPS_optim_is_running() const;
+
     //! Abort the loop BA externally
     void abort_loop_BA();
 
@@ -107,8 +110,16 @@ public:
     void disable_gps_initializer();
 
     //! Is gps initializer active
-    bool is_gps_initializer_enabled();
+    bool is_gps_initializer_enabled() const;
 
+    //! if the trajectory is initialized with GPS readings
+    bool is_gps_initialized() const;
+
+    //! get current nr of keyframes
+    unsigned int get_current_nr_kfs() const;
+
+    //! request global optim
+    void request_global_GPS_optim();
     //-----------------------------------------
     // data feeding methods
 
@@ -165,6 +176,9 @@ public:
 
     //! query if gps data usage is enabled
     bool is_gps_data_used();
+
+    //! is local BA running
+    bool is_local_ba_running() const;
 private:
     //! Check reset request of the system
     void check_reset_request();

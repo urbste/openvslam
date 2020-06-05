@@ -1,6 +1,7 @@
 // created by Steffen Urban April 2020, urbste@gmail.com
 #include "gopro_util.h"
 #include "openvslam/type.h"
+#include "openvslam/gps/data.h"
 
 #include <string>
 #include <vector>
@@ -23,7 +24,7 @@ double lerp(const double a,const  double b,const  double t) {
 }
 
 void interpolate_gps_data_for_cam_time(const std::vector<openvslam::gps::data>& gps_data,
-                                    const double image_timestamp, const double gps_frequency_ms,
+                                    const double image_timestamp,
                                     openvslam::gps::data& interpolated_gps_data) {
 
     const double last_gps_timestamp = gps_data[gps_data.size()-1].ts_;
@@ -40,9 +41,12 @@ void interpolate_gps_data_for_cam_time(const std::vector<openvslam::gps::data>& 
             continue;
 
         const double delta_t2 = image_timestamp - gps_data[data_idx_1].ts_;
+
+        // also make sure the deltas are within the camera frequency
         if (delta_t2 <= 0 && delta_t1 >= 0) {
 
             const double delta_t1_abs = std::abs(delta_t1);
+
             // now interpolate linearly between two gps timestamps
             const double gps_t1 = gps_data[data_idx].ts_;
             const double gps_t2 = gps_data[data_idx_1].ts_;
@@ -76,6 +80,6 @@ void gopro_input_telemetry::get_gps_data_at_time(const double camera_timestamp,
         interpolated_data = gps_data_[gps_data_.size()-1];
     } else {
         interpolate_gps_data_for_cam_time(gps_data_, camera_timestamp,
-                                          gps_config_.get_rate_dt(),interpolated_data);
+                                          interpolated_data);
     }
 }

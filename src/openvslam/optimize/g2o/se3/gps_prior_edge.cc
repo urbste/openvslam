@@ -65,7 +65,8 @@ bool gps_prior_edge::write(std::ostream& os) const {
 
 void gps_prior_edge::computeError() {
   const shot_vertex* v = static_cast<const shot_vertex*>(_vertices[0]);
-  const Vec3_t cam_center = -v->estimate().rotation().toRotationMatrix()*v->estimate().translation();
+  const Vec3_t cam_center = - v->estimate().rotation().toRotationMatrix().transpose()*
+          v->estimate().translation();
   _error = cam_center - _measurement;
 }
 
@@ -77,7 +78,7 @@ void gps_prior_edge::computeError() {
 
 //void gps_prior_edge::linearizeOplus() {
 //   _jacobianOplusXi << Mat33_t::Identity();
-// }
+//}
 
 //void gps_prior_edge::initialEstimate(const ::g2o::OptimizableGraph::VertexSet& /*from_*/,
 //                                     ::g2o::OptimizableGraph::Vertex* /*to_*/) {

@@ -229,8 +229,24 @@ bool system::loop_BA_is_running() const {
     return global_optimizer_->loop_BA_is_running();
 }
 
+bool system::global_GPS_optim_is_running() const {
+    return global_optimizer_->gps_optim_is_running();
+}
+
 void system::abort_loop_BA() {
     global_optimizer_->abort_loop_BA();
+}
+
+bool system::is_gps_initialized() const {
+    return global_optimizer_->is_gps_initialized();
+}
+
+unsigned int system::get_current_nr_kfs() const {
+    return map_db_->get_all_keyframes().size();
+}
+
+void system::request_global_GPS_optim() {
+    global_optimizer_->run_global_GPS_optim();
 }
 
 Mat44_t system::feed_monocular_frame(const cv::Mat& img, const double timestamp, const cv::Mat& mask) {
@@ -288,6 +304,8 @@ void system::feed_GPS_data(const gps::data& gps_data) {
 
 void system::set_use_gps_data() {
     use_gps_data_ = true;
+    // enable gps if it comes with the data
+    global_optimizer_->enable_gps();
 }
 
 bool system::is_gps_data_used() {
@@ -360,6 +378,10 @@ void system::resume_other_threads() const {
     if (mapper_) {
         mapper_->resume();
     }
+}
+
+bool system::is_local_ba_running() const {
+    return mapper_->is_local_ba_running();
 }
 
 } // namespace openvslam

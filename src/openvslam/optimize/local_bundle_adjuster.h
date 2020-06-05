@@ -33,11 +33,15 @@ public:
      */
     void optimize(data::keyframe* curr_keyfrm, bool* const force_stop_flag) const;
 
+    void set_gps_initialized() { gps_initialized_ = true; }
+
 private:
     //! number of iterations of first optimization
     const unsigned int num_first_iter_;
     //! number of iterations of second optimization
     const unsigned int num_second_iter_;
+    //! is gps initialized
+    bool gps_initialized_;
 };
 
 } // namespace optimize

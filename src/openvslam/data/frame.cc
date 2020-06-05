@@ -10,6 +10,7 @@
 #include "openvslam/match/stereo.h"
 
 #include <thread>
+#include <chrono>  // for high_resolution_clock
 
 #include <spdlog/spdlog.h>
 
@@ -266,6 +267,8 @@ Vec3_t frame::triangulate_stereo(const unsigned int idx) const {
 }
 
 void frame::extract_orb(const cv::Mat& img, const cv::Mat& mask, const image_side& img_side) {
+    auto start = std::chrono::high_resolution_clock::now();
+
     switch (img_side) {
         case image_side::Left: {
             extractor_->extract(img, mask, keypts_, descriptors_);
@@ -276,6 +279,8 @@ void frame::extract_orb(const cv::Mat& img, const cv::Mat& mask, const image_sid
             break;
         }
     }
+    std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - start;
+    std::cout << "Elapsed time orb extraction: " << elapsed.count() << " s\n";
 }
 
 void frame::compute_stereo_from_depth(const cv::Mat& right_img_depth) {

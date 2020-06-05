@@ -12,6 +12,25 @@
 namespace openvslam {
 namespace solve {
 
+sim3_solver::sim3_solver(const eigen_alloc_vector<Vec3_t> &kf_poses,
+                         const eigen_alloc_vector<Vec3_t> &gps_poses,
+                         const bool fix_scale,
+                         const unsigned int min_num_inliers,
+                         const double chi2,
+                         const double lambda2)
+    :fix_scale_(fix_scale), min_num_inliers_(min_num_inliers), min_lambda2_(lambda2) {
+
+    // naming is not good, but sim3 solver is not made for that
+    common_pts_in_keyfrm_1_ = kf_poses;
+    common_pts_in_keyfrm_2_ = gps_poses;
+    num_common_pts_ = kf_poses.size();
+
+    for (size_t i = 0; i < num_common_pts_; ++i) {
+        chi_sq_x_sigma_sq_1_.push_back(chi2);
+        chi_sq_x_sigma_sq_2_.push_back(chi2);
+    }
+}
+
 sim3_solver::sim3_solver(data::keyframe* keyfrm_1, data::keyframe* keyfrm_2,
                          const std::vector<data::landmark*>& matched_lms_in_keyfrm_2,
                          const bool fix_scale, const unsigned int min_num_inliers)
@@ -87,6 +106,75 @@ sim3_solver::sim3_solver(data::keyframe* keyfrm_1, data::keyframe* keyfrm_2,
     reproject_to_same_image(common_pts_in_keyfrm_2_, reprojected_2_, keyfrm_2_);
 }
 
+unsigned int sim3_solver::find_pcl_alignment(const unsigned int max_num_iter,
+                                             const unsigned int min_set) {
+    // best model
+    unsigned int max_num_inliers = 0;
+    solution_is_valid_ = false;
+    best_rot_12_ = Mat33_t::Zero();
+    best_trans_12_ = Vec3_t::Zero();
+    best_scale_12_ = 0.0;
+
+    if (num_common_pts_ < 3 || num_common_pts_ < min_num_inliers_) {
+        solution_is_valid_ = false;
+        return 0;
+    }
+
+    // RANSAC loop
+    Mat33_t rot_12_in_sac;
+    Vec3_t trans_12_in_sac;
+    float scale_12_in_sac;
+    Mat33_t rot_21_in_sac;
+    Vec3_t trans_21_in_sac;
+    float scale_21_in_sac;
+    double lambda2 = 0.0;
+
+    // RANSAC loop
+    for (unsigned int iter = 0; iter < max_num_iter; ++iter) {
+        eigen_alloc_vector<Vec3_t> pts_1(min_set), pts_2(min_set);
+        std::vector<double> weights(min_set);
+        const auto random_indices = util::create_random_array(min_set, 0, static_cast<int>(num_common_pts_ - 1));
+        for (unsigned int i = 0; i < min_set; ++i) {
+            pts_1[i] = common_pts_in_keyfrm_1_.at(random_indices.at(i));
+            pts_2[i] = common_pts_in_keyfrm_2_.at(random_indices.at(i));
+            weights[i] = 1.0;
+        }
+
+        // 相似変換行列(R,t,s)を求める
+       lambda2 = compute_Sim3_Umeyama(pts_1, pts_2, weights,
+                     rot_12_in_sac, trans_12_in_sac, scale_12_in_sac,
+                     rot_21_in_sac, trans_21_in_sac, scale_21_in_sac);
+
+
+        // インライアを数える
+        std::vector<bool> inliers;
+        const auto num_inliers = count_inliers_pcl(rot_12_in_sac, trans_12_in_sac, scale_12_in_sac,
+                                               rot_21_in_sac, trans_21_in_sac, scale_21_in_sac,
+                                               inliers);
+
+        // ベストモデルを更新
+        if (max_num_inliers < num_inliers) {
+            max_num_inliers = num_inliers;
+            best_rot_12_ = rot_12_in_sac;
+            best_trans_12_ = trans_12_in_sac;
+            best_scale_12_ = scale_12_in_sac;
+        }
+    }
+
+    if (max_num_inliers < min_num_inliers_ || lambda2 < min_lambda2_) {
+        // インライア数の最小条件を満たせなかった場合は推定失敗
+        solution_is_valid_ = false;
+        best_rot_12_ = Mat33_t::Zero();
+        best_trans_12_ = Vec3_t::Zero();
+        best_scale_12_ = 0.0;
+        return 0;
+    }
+    else {
+        solution_is_valid_ = true;
+        return max_num_inliers;
+    }
+}
+
 void sim3_solver::find_via_ransac(const unsigned int max_num_iter) {
     // best modelを初期化
     unsigned int max_num_inliers = 0;
@@ -141,7 +229,7 @@ void sim3_solver::find_via_ransac(const unsigned int max_num_iter) {
     if (max_num_inliers < min_num_inliers_) {
         // インライア数の最小条件を満たせなかった場合は推定失敗
         solution_is_valid_ = false;
-        best_rot_12_ = Mat33_t::Zero();
+        best_rot_12_ = Mat33_t::Identity();
         best_trans_12_ = Vec3_t::Zero();
         best_scale_12_ = 0.0;
         return;
@@ -150,6 +238,75 @@ void sim3_solver::find_via_ransac(const unsigned int max_num_iter) {
         solution_is_valid_ = true;
         return;
     }
+}
+
+double sim3_solver::compute_Sim3_Umeyama(const eigen_alloc_vector<Vec3_t>& pts_1,
+                                      const eigen_alloc_vector<Vec3_t>& pts_2,
+                                       const std::vector<double>& weights,
+                                      Mat33_t& rot_12, Vec3_t& trans_12, float& scale_12,
+                                      Mat33_t& rot_21, Vec3_t& trans_21, float& scale_21) {
+
+    const size_t num_points = pts_1.size();
+    Eigen::Map<const Eigen::Matrix<double, 3, Eigen::Dynamic> > left_points(
+        pts_1[0].data(), 3, num_points);
+    Eigen::Map<const Eigen::Matrix<double, 3, Eigen::Dynamic> > right_points(
+        pts_2[0].data(), 3, num_points);
+
+    Eigen::Vector3d left_centroid, right_centroid;
+    left_centroid.setZero();
+    right_centroid.setZero();
+    double weights_sum = 0.0;
+    for (size_t i = 0; i < num_points; i++) {
+      weights_sum += weights[i];
+      left_centroid  += pts_1[i] * weights[i];
+      right_centroid += pts_2[i] * weights[i];
+    }
+
+    left_centroid /= weights_sum;
+    right_centroid /= weights_sum;
+
+    double sigma = 0.0;
+    for (size_t i = 0; i < num_points; i++) {
+      sigma += (pts_1[i] - left_centroid).squaredNorm() * weights[i];
+    }
+    sigma /= weights_sum;
+
+    // Calculate cross correlation matrix based on the points shifted about the
+    // centroid.
+    Eigen::Matrix3d cross_correlation = Eigen::Matrix3d::Zero();
+    for (size_t i = 0; i < num_points; i++) {
+      cross_correlation += weights[i] * (left_points.col(i) - left_centroid) *
+                           (right_points.col(i) - right_centroid).transpose();
+    }
+    cross_correlation /= weights_sum;
+
+    // Compute SVD decomposition of the cross correlation.
+    Eigen::JacobiSVD<Eigen::Matrix3d> svd(
+        cross_correlation.transpose(), Eigen::ComputeFullU | Eigen::ComputeFullV);
+
+    const Eigen::Matrix3d& umatrix = svd.matrixU();
+    const Eigen::Matrix3d& vtmatrix = svd.matrixV().transpose();
+    const Eigen::Vector3d& singular_values = svd.singularValues();
+
+    const double det = umatrix.determinant() * vtmatrix.determinant();
+    Eigen::Matrix3d s = Eigen::Matrix3d::Identity();
+    s(2, 2) = det > 0 ? 1 : -1;
+
+    if (fix_scale_) {
+        scale_21 = 1.0;
+    } else {
+        scale_21 =
+            (singular_values(0) + singular_values(1) + s(2, 2) * singular_values(2)) /
+            sigma;
+    }
+    rot_21 = umatrix * s * vtmatrix;
+    trans_21 = right_centroid - scale_21 * rot_21 * left_centroid;
+
+    rot_12 = rot_21.transpose();
+    scale_12 = 1.0 / scale_21;
+    trans_12 = -scale_12 * rot_12 * trans_21;
+
+    return singular_values(1);
 }
 
 void sim3_solver::compute_Sim3(const Mat33_t& pts_1, const Mat33_t& pts_2,
@@ -193,7 +350,6 @@ void sim3_solver::compute_Sim3(const Mat33_t& pts_1, const Mat33_t& pts_2,
 
     // Nを固有値分解する
     Eigen::EigenSolver<Mat44_t> eigensolver(N);
-
     // 最大固有値を探す
     const auto& eigenvalues = eigensolver.eigenvalues();
     int max_idx = -1;
@@ -244,6 +400,29 @@ void sim3_solver::compute_Sim3(const Mat33_t& pts_1, const Mat33_t& pts_2,
     trans_12 = -scale_12 * rot_12 * trans_21;
 }
 
+unsigned int sim3_solver::count_inliers_pcl(const Mat33_t& rot_12, const Vec3_t& trans_12, const float scale_12,
+                                        const Mat33_t& rot_21, const Vec3_t& trans_21, const float scale_21,
+                                        std::vector<bool>& inliers) {
+    // 推定した相似変換行列を使って，片方の3次元点をもう片方の画像上に再投影し，距離計算する
+    unsigned int num_inliers = 0;
+    inliers.resize(num_common_pts_, false);
+
+
+    // transform points from 1 to 2 and 2 to 1
+    for (size_t i=0; i < num_common_pts_; ++i) {
+        const Vec3_t pt_1_in_2 = scale_21 * rot_21 * common_pts_in_keyfrm_1_[i] + trans_21;
+
+        const double error_in_2 = (pt_1_in_2 - common_pts_in_keyfrm_2_[i]).norm();
+
+        if (error_in_2 < chi_sq_x_sigma_sq_1_.at(i)) {
+            inliers.at(i) = true;
+            ++num_inliers;
+        }
+    }
+
+    return num_inliers;
+}
+
 unsigned int sim3_solver::count_inliers(const Mat33_t& rot_12, const Vec3_t& trans_12, const float scale_12,
                                         const Mat33_t& rot_21, const Vec3_t& trans_21, const float scale_21,
                                         std::vector<bool>& inliers) {
@@ -251,7 +430,6 @@ unsigned int sim3_solver::count_inliers(const Mat33_t& rot_12, const Vec3_t& tra
     unsigned int num_inliers = 0;
     inliers.resize(num_common_pts_, false);
 
-    // 座標系1の3次元点を座標系2の画像上に投影
     std::vector<Vec2_t, Eigen::aligned_allocator<Vec2_t>> reprojected_1_in_cam_2;
     reproject_to_other_image(common_pts_in_keyfrm_1_, reprojected_1_in_cam_2, rot_21, trans_21, scale_21, keyfrm_2_);
 

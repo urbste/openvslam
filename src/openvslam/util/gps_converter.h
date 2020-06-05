@@ -39,6 +39,13 @@ public:
     // degrees, and the altitude will be in meters.
     static Vec3_t ECEFToLLA(const Vec3_t& ecef);
 
+    // Converts ECEF coordinates to GPS latitude, longitude, and altitude. ECEF
+    // coordinates should be in meters. The returned latitude and longitude are in
+    // degrees, and the altitude will be in meters.
+    // Karl Osen (2019): Accurate Conversion of Earth-Fixed Earth-Centered
+    // Coordinates to Geodetic Coordinates
+    static void ECEFToLLA_new(const Vec3_t& ecef, Vec3_t& lla);
+
     // Converts GPS latitude, longitude, and altitude to ECEF coordinates. The
     // latitude and longitude should be in degrees and the altitude in meters. The
     // returned ECEF coordinates will be in meters.

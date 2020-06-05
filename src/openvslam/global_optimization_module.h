@@ -8,6 +8,8 @@
 #include "openvslam/module/loop_bundle_adjuster.h"
 #include "openvslam/module/gps_initializer.h"
 #include "openvslam/optimize/graph_optimizer.h"
+#include "openvslam/optimize/global_gps_bundle_adjuster.h"
+#include "openvslam/optimize/local_bundle_adjuster.h"
 
 #include <list>
 #include <mutex>
@@ -119,9 +121,18 @@ public:
     //! Check if loop BA is running or not
     bool gps_initializer_is_running() const;
 
+    //! Check if GPS optim is running
+    bool gps_optim_is_running() const;
+
     //! Abort the loop BA externally
     //! (NOTE: this function does not wait for abort)
     void abort_gps_initializer();
+
+    //! is gps initialized
+    bool is_gps_initialized() const;
+
+    //! run global gps optim
+    void run_global_GPS_optim();
 private:
     //-----------------------------------------
     // main process
@@ -233,12 +244,21 @@ private:
 
     //! graph optimizer
     std::unique_ptr<optimize::graph_optimizer> graph_optimizer_ = nullptr;
-
+    //! large global bundle adjuster
+    std::unique_ptr<optimize::global_gps_bundle_adjuster> global_gps_optimizer_ = nullptr;
+    //! to tell the local BA that GPS is initialized
+    std::unique_ptr<optimize::local_bundle_adjuster> local_bundle_adjuster = nullptr;
     //-----------------------------------------
     // variables for loop BA
 
     //! thread for running loop BA
     std::unique_ptr<std::thread> thread_for_loop_BA_ = nullptr;
+
+    //! if global GPS can run again
+    bool run_global_GPS_optim_ = false;
+
+    //! if gps is initialized
+    bool GPS_is_initialized_ = false;
 };
 
 } // namespace openvslam

@@ -26,7 +26,7 @@ namespace optimize {
 
 local_bundle_adjuster::local_bundle_adjuster(const unsigned int num_first_iter,
                                              const unsigned int num_second_iter)
-    : num_first_iter_(num_first_iter), num_second_iter_(num_second_iter) {}
+    : num_first_iter_(num_first_iter), num_second_iter_(num_second_iter), gps_initialized_(false) {}
 
 void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, bool* const force_stop_flag) const {
     // 1. local/fixed keyframes, local landmarksを集計する
@@ -105,7 +105,6 @@ void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, boo
 
     ::g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(algorithm);
-
     if (force_stop_flag) {
         optimizer.setForceStopFlag(force_stop_flag);
     }
@@ -128,23 +127,9 @@ void local_bundle_adjuster::optimize(openvslam::data::keyframe* curr_keyfrm, boo
         all_keyfrms.emplace(id_local_keyfrm_pair);
         auto keyfrm_vtx = keyfrm_vtx_container.create_vertex(local_keyfrm, local_keyfrm->id_ == 0);
         optimizer.addVertex(keyfrm_vtx);
-
-
-//        // add gps prios to test
-//        auto gps_edge = new g2o::se3::gps_prior_edge();
-//        gps_edge->setMeasurement(local_keyfrm->get_gps_data().xyz_);
-//        gps_edge->setInformation(Mat33_t::Identity() * (1./local_keyfrm->get_gps_data().dop_precision_));
-//        gps_edge->setVertex(0, keyfrm_vtx);
-//        gps_edge->setParameterId(0,0);
-//        optimizer.addEdge(gps_edge);
     }
 
     // fixed keyframesをoptimizerにセット
-
-
-
-
-
     for (auto& id_fixed_keyfrm_pair : fixed_keyfrms) {
         auto fixed_keyfrm = id_fixed_keyfrm_pair.second;
 

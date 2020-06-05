@@ -11,6 +11,7 @@ data::data(const double latitude, const double longitude, const double height,
     : llh_(latitude, longitude, height), dop_precision_(dop_precision),
       speed_2d_(speed_2d), speed_3d_(speed_3d), fix_(fix), ts_(ts) {
     xyz_ = openvslam::util::gps_converter::LLAToECEF(llh_);
+    scaled_xyz_ = xyz_ / gps_scaler;
 }
 
 data::data(const Vec3_t& llh,  const double dop_precision,
@@ -19,10 +20,12 @@ data::data(const Vec3_t& llh,  const double dop_precision,
     : llh_(llh), dop_precision_(dop_precision),
       speed_2d_(speed_2d), speed_3d_(speed_3d), fix_(fix), ts_(ts) {
     xyz_ = openvslam::util::gps_converter::LLAToECEF(llh_);
+    scaled_xyz_ = xyz_ / gps_scaler;
 }
 
 void data::Set_XYZ(const Vec3_t &xyz) {
     xyz_ = xyz;
+    scaled_xyz_ = xyz_ / gps_scaler;
     llh_ = openvslam::util::gps_converter::ECEFToLLA(xyz);
 }
 
