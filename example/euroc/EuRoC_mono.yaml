@@ -29,17 +29,18 @@ Camera.color_order: "Gray"
 # ORB Parameters #
 #================#
 
-Feature.max_num_keypoints: 1200
-Feature.scale_factor: 2.0
-Feature.num_levels: 4
+Feature.max_num_keypoints: 1000
+Feature.scale_factor: 1.2
+Feature.num_levels: 8
 Feature.ini_fast_threshold: 20
-Feature.min_fast_threshold: 7
+Feature.min_fast_threshold: 20
 
 #=====================#
 # Tracking Parameters #
 #=====================#
 
 depth_threshold: 35
+use_sparse_image_alignment: 1
 
 #===========================#
 # PangolinViewer Parameters #

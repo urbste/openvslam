@@ -108,7 +108,7 @@ config::config(const YAML::Node& yaml_node, const std::string& config_file_path)
         depthmap_factor_ = yaml_node_["depthmap_factor"].as<double>(1.0);
     }
 
-    //use_sparse_image_alignment_ = yaml_node_["use_sparse_image_alignment"].as<bool>();
+    use_sparse_image_alignment_ = (bool)yaml_node_["use_sparse_image_alignment"].as<int>();
 }
 
 config::~config() {

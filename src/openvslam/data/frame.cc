@@ -51,9 +51,11 @@ frame::frame(const frame &frm) :
     rot_cw_(frm.rot_cw_), trans_cw_(frm.trans_cw_),
     rot_wc_(frm.rot_wc_), cam_center_(frm.cam_center_)
 {
-    // copy the image pyramid
-    for (const cv::Mat &mat: frm.image_pyramid_) {
-        image_pyramid_.push_back(mat.clone());
+    if (save_image_pyramid_) {
+        // copy the image pyramid
+        for (const cv::Mat &mat: frm.image_pyramid_) {
+            image_pyramid_.push_back(mat.clone());
+        }
     }
 }
 
@@ -66,41 +68,32 @@ frame::frame(const cv::Mat& img_gray, const double timestamp,
       img_gray_(img_gray), mask_(mask), features_extracted_(false){
     // Get ORB scale
     update_orb_info();
+    // Extract ORB feature
+    if (!save_image_pyramid_) {
+        extract_orb(img_gray, mask);
+        num_keypts_ = keypts_.size();
+        if (keypts_.empty()) {
+            spdlog::warn("frame {}: cannot extract any keypoints", id_);
+        }
 
-    // clone image pyramid
-    //if (save_image_pyramid_) {
-    //    extractor_->get_image_pyramid(img_gray_, image_pyramid_);
-    //}
+        // Undistort keypoints
+        camera_->undistort_keypoints(keypts_, undist_keypts_);
 
+        // Ignore stereo parameters
+        stereo_x_right_ = std::vector<float>(num_keypts_, -1);
+        depths_ = std::vector<float>(num_keypts_, -1);
 
+        // Convert to bearing vector
+        camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
 
+        // Initialize association with 3D points
+        landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
+        outlier_flags_ = std::vector<bool>(num_keypts_, false);
 
-
-//    // Extract ORB feature
-//    if (extract_features) {
-//        extract_orb(img_gray, mask);
-//        num_keypts_ = keypts_.size();
-//        if (keypts_.empty()) {
-//            spdlog::warn("frame {}: cannot extract any keypoints", id_);
-//        }
-
-//        // Undistort keypoints
-//        camera_->undistort_keypoints(keypts_, undist_keypts_);
-
-//        // Ignore stereo parameters
-//        stereo_x_right_ = std::vector<float>(num_keypts_, -1);
-//        depths_ = std::vector<float>(num_keypts_, -1);
-
-//        // Convert to bearing vector
-//        camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
-
-//        // Initialize association with 3D points
-//        landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
-//        outlier_flags_ = std::vector<bool>(num_keypts_, false);
-
-//        // Assign all the keypoints into grid
-//        assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
-//    }
+        // Assign all the keypoints into grid
+        assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+        features_extracted_ = true;
+    }
 }
 
 frame::frame(const cv::Mat& left_img_gray, const cv::Mat& right_img_gray, const double timestamp,

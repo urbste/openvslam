@@ -283,9 +283,9 @@ double sparse_image_aligner::computeResiduals(
 
                 // robustification
                 double weight = 1.0;
-                //if (use_weights_) {
-                //    weight = huber_loss(res, 4);
-                //}
+                if (use_weights_) {
+                    weight = huber_loss(res, 5);
+                }
 
                 chi2 += res * res * weight;
                 n_meas_++;

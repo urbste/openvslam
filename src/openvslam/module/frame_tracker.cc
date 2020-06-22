@@ -15,6 +15,9 @@
 #include <spdlog/spdlog.h>
 #include <memory>
 
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
+
 namespace openvslam {
 namespace module {
 
@@ -229,13 +232,27 @@ std::vector<std::pair<data::keyframe *, unsigned int>> SelectNearestKeyframe(
         return std::vector<std::pair<data::keyframe *, unsigned int>>(s.begin(), s.begin() + n);
 }
 
+double get_convex_hull_area(const std::vector<cv::Point2f>& originalPoints,
+                            const double img_area) {
+    if (originalPoints.empty()) {
+        return img_area;
+    }
+    std::vector<cv::Point2f> convexHull;  // Convex hull points
+    // Calculate convex hull of original points (which points positioned on the boundary)
+    cv::convexHull(originalPoints,convexHull,false);
+
+    const double area = fabs(cv::contourArea(convexHull));
+
+    return area / img_area * 100.0;
+}
+
 unsigned int frame_tracker::sparse_feat_alignment_track(
         data::frame& curr_frame,
         data::keyframe* ref_keyframe,
         std::vector<data::landmark*> local_landmarks,
         std::set<data::landmark*>& direct_map_points_cache) const {
 
-    optimize::pose_optimizer sparse_feat_pose_optimizer_(2, 10);
+    optimize::pose_optimizer sparse_feat_pose_optimizer_(1, 10);
 
 
     int cntSuccess = 0;
@@ -244,7 +261,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
     const int grid_rows = curr_frame.image_pyramid_[0].rows / grid_size;
     const int grid_cols = curr_frame.image_pyramid_[0].cols / grid_size;
     std::vector<bool> grid(grid_rows * grid_cols, false);
-
+    std::vector<cv::Point2f> convex_hull_pts;
     if (!direct_map_points_cache.empty()) {
         for (auto iter = direct_map_points_cache.begin(); iter != direct_map_points_cache.end();) {
             data::landmark *mp = *iter;
@@ -309,7 +326,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
                 curr_frame.depths_.push_back(-1);
                 curr_frame.outlier_flags_.push_back(false);
                 curr_frame.stereo_x_right_.push_back(-1.f);
-
+                convex_hull_pts.push_back(cv::Point2f(kp_curr.pt.x, kp_curr.pt.y));
                 int gx = static_cast<int> ( px_ave[0] / grid_size );
                 int gy = static_cast<int> ( px_ave[1] / grid_size );
                 int k = gy * grid_cols + gx;
@@ -322,14 +339,18 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
             }
         }
     }
-
-    if (cntSuccess > cache_hit_thresh_) {
+    const double img_area =
+            curr_frame.image_pyramid_[0].rows *
+            curr_frame.image_pyramid_[0].cols;
+    const double percent_occupied = get_convex_hull_area(convex_hull_pts, img_area);
+    std::cout<<"img pts occupy "<<percent_occupied<<" percent of image area\n";
+    if (percent_occupied > 50.0 && !direct_map_points_cache.empty()) {
         // we matched enough points in cache, then do pose optimization
         curr_frame.num_keypts_ = curr_frame.keypts_.size();
         curr_frame.stereo_x_right_.resize(curr_frame.num_keypts_,-1.0f);
         sparse_feat_pose_optimizer_.optimize(curr_frame);
         unsigned int num_valid_pts = discard_outliers_sparse(curr_frame, direct_map_points_cache);
-        if (num_valid_pts < 80) {
+        if (num_valid_pts < 50) {
             spdlog::warn("re Track Local Map direct failed");
             return num_valid_pts;
         } else {
@@ -356,6 +377,14 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
             continue;
         }
 
+//        int gx = static_cast<int> (track_xy[0] / grid_size );
+//        int gy = static_cast<int> (track_xy[1] / grid_size );
+//        int k = gy * grid_cols + gx;
+
+//        if (grid[k] == true) {
+//            continue;        // already exist a projection in that grid
+//        }
+
         match::sparse_feature_aligner sparse_feat_aligner;
         // try align it with current frame
         const std::map<data::keyframe*, unsigned int> obs = mp->get_observations();
@@ -374,11 +403,14 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
                 break;
             }
         }
+
         if (!matched_pixels.empty()) {
             Vec2_t px_ave(0, 0);
             for (Vec2_t &p: matched_pixels)
                 px_ave += p;
             px_ave = px_ave / matched_pixels.size();
+
+
 
             // insert a feature and assign it to a map point
             const cv::KeyPoint kp_curr = cv::KeyPoint(cv::Point2f(px_ave[0], px_ave[1]), 7, -1, 0, 0);
@@ -393,6 +425,11 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
             curr_frame.outlier_flags_.push_back(false);
             curr_frame.stereo_x_right_.push_back(-1.f);
 
+//            int gx = static_cast<int> ( px_ave[0] / grid_size );
+//            int gy = static_cast<int> ( px_ave[1] / grid_size );
+//            int k = gy * grid_cols + gx;
+//            grid[k] = true;
+
             direct_map_points_cache.insert(mp);
         } else {
             rejected++;
@@ -403,7 +440,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
     curr_frame.keypts_right_.resize(curr_frame.num_keypts_);
     sparse_feat_pose_optimizer_.optimize(curr_frame);
     unsigned int num_valid_pts = discard_outliers_sparse(curr_frame, direct_map_points_cache);
-    if (num_valid_pts < 100) {
+    if (num_valid_pts < 50) {
         spdlog::warn("Track Local Map direct failed");
         return num_valid_pts;
     } else {
