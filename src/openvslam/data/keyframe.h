@@ -59,7 +59,8 @@ public:
              const unsigned int num_keypts, const std::vector<cv::KeyPoint>& keypts,
              const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
              const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
-             const unsigned int num_scale_levels, const float scale_factor,
+             const unsigned int num_scale_levels, const float scale_factor, const std::vector<cv::Mat> &image_pyramid,
+             const bool save_image_pyramid,
              bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db);
 
     /**
@@ -284,7 +285,8 @@ public:
     const std::vector<float> level_sigma_sq_;
     //! list of 1 / sigma^2 for optimization
     const std::vector<float> inv_level_sigma_sq_;
-
+    //! image pyramid for sparse alignment
+    std::vector<cv::Mat> image_pyramid_;
 private:
     //-----------------------------------------
     // camera pose
@@ -324,6 +326,9 @@ private:
 
     //! flag which indicates this keyframe will be erased
     std::atomic<bool> will_be_erased_{false};
+
+    //! if image pyramids are save
+    bool save_image_pyramid_;
 };
 
 } // namespace data

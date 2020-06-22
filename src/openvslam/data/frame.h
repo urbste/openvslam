@@ -44,6 +44,12 @@ public:
     bool operator!=(const frame& frm) { return !(*this == frm); }
 
     /**
+     * @brief copy constructor
+     * @param frm
+     */
+    frame(const frame& frm);
+
+    /**
      * Constructor for monocular frame
      * @param img_gray
      * @param timestamp
@@ -55,7 +61,7 @@ public:
      */
     frame(const cv::Mat& img_gray, const double timestamp,
           feature::orb_extractor* extractor, bow_vocabulary* bow_vocab,
-          camera::base* camera, const float depth_thr,
+          camera::base* camera, const float depth_thr, const bool save_image_pyramid = false,
           const cv::Mat& mask = cv::Mat{});
 
     /**
@@ -72,7 +78,7 @@ public:
      */
     frame(const cv::Mat& left_img_gray, const cv::Mat& right_img_gray, const double timestamp,
           feature::orb_extractor* extractor_left, feature::orb_extractor* extractor_right, bow_vocabulary* bow_vocab,
-          camera::base* camera, const float depth_thr,
+          camera::base* camera, const float depth_thr, const bool save_image_pyramid = false,
           const cv::Mat& mask = cv::Mat{});
 
     /**
@@ -88,7 +94,7 @@ public:
      */
     frame(const cv::Mat& img_gray, const cv::Mat& img_depth, const double timestamp,
           feature::orb_extractor* extractor, bow_vocabulary* bow_vocab,
-          camera::base* camera, const float depth_thr,
+          camera::base* camera, const float depth_thr, const bool save_image_pyramid = false,
           const cv::Mat& mask = cv::Mat{});
 
     /**
@@ -134,7 +140,8 @@ public:
      * Check observability of the landmark
      */
     bool can_observe(landmark* lm, const float ray_cos_thr,
-                     Vec2_t& reproj, float& x_right, unsigned int& pred_scale_level) const;
+                     Vec2_t& reproj, float& x_right, unsigned int& pred_scale_level,
+                     const bool proj_distorted = false) const;
 
     /**
      * Get keypoint indices in the cell which reference point is located
@@ -243,7 +250,22 @@ public:
     std::vector<float> level_sigma_sq_;
     //! list of 1 / sigma^2 for optimization
     std::vector<float> inv_level_sigma_sq_;
+    //! image pyramid for sparse alignment
+    std::vector<cv::Mat> image_pyramid_;
+    //! flag to indicate wether image pyramid should be saved
+    bool save_image_pyramid_;
 
+    //! run feature extraction if kf is inserted
+    void run_feature_extraction(const bool clear_features = false);
+
+    cv::Mat img_gray_;
+    cv::Mat mask_;
+
+    bool features_extracted_;
+
+    void reset_features();
+
+    void create_image_pyramid();
 private:
     //! enumeration to control the behavior of extract_orb()
     enum class image_side { Left,
@@ -272,6 +294,7 @@ private:
     Mat33_t rot_wc_;
     //! translation: camera -> world
     Vec3_t cam_center_;
+
 };
 
 } // namespace data

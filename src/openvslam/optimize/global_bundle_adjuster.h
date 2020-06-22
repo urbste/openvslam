@@ -17,7 +17,7 @@ public:
      * @param num_iter
      * @param use_huber_kernel
      */
-    explicit global_bundle_adjuster(data::map_database* map_db, const unsigned int num_iter = 10, const bool use_huber_kernel = true);
+    explicit global_bundle_adjuster(data::map_database* map_db, const unsigned int num_iter = 20, const bool use_huber_kernel = true);
 
     /**
      * Destructor

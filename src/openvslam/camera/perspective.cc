@@ -4,6 +4,8 @@
 
 #include <spdlog/spdlog.h>
 #include <nlohmann/json.hpp>
+#include <chrono>
+using time_now = std::chrono::steady_clock;
 
 namespace openvslam {
 namespace camera {
@@ -18,8 +20,8 @@ perspective::perspective(const std::string& name, const setup_type_t& setup_type
       k1_(k1), k2_(k2), p1_(p1), p2_(p2), k3_(k3) {
     spdlog::debug("CONSTRUCT: camera::perspective");
 
-    cv_cam_matrix_ = (cv::Mat_<float>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
-    cv_dist_params_ = (cv::Mat_<float>(5, 1) << k1_, k2_, p1_, p2_, k3_);
+    cv_cam_matrix_ = (cv::Mat_<double>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
+    cv_dist_params_ = (cv::Mat_<double>(5, 1) << k1_, k2_, p1_, p2_, k3_);
 
     eigen_cam_matrix_ << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1;
     eigen_dist_params_ << k1_, k2_, p1_, p2_, k3_;
@@ -168,6 +170,35 @@ bool perspective::reproject_to_image(const Mat33_t& rot_cw, const Vec3_t& trans_
             && img_bounds_.min_y_ < reproj(1) && reproj(1) < img_bounds_.max_y_);
 }
 
+bool perspective::reproject_to_image_distorted(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec2_t& reproj, float& x_right) const {
+
+    // convert to camera-coordinates
+    const Vec3_t pos_c = rot_cw * pos_w + trans_cw;
+
+    // check if the point is visible
+    if (pos_c(2) <= 0.0) {
+        return false;
+    }
+
+    // do distorted projection
+    const double xs = pos_c[0] / pos_c[2];
+    const double ys = pos_c[1] / pos_c[2];
+    const double xsys = 2.0* xs * ys;
+    const double r2 = xs * xs + ys * ys;
+    const double r4 = r2 * r2;
+    const double r6 = r4*r2;
+    const double dist = 1.0 + k1_*r2 + k2_*r4 + k3_*r6;
+    reproj(0) = fx_ * (xs * dist + p1_ * xsys + p2_ * (r2 + 2.0 * xs * xs)) + cx_;
+    reproj(1) = fy_ * (ys * dist + p1_ * (r2 + 2.0 * ys * ys) + p2_ * xsys) + cy_;
+
+    // reproject onto the image
+    x_right = reproj(0) - focal_x_baseline_ / pos_c[2];
+
+    // check if the point is visible
+    return (0.0 < reproj(0) && reproj(0) < static_cast<double>(cols_)
+            && 0.0 < reproj(1) && reproj(1) < static_cast<double>(rows_));
+}
+
 bool perspective::reproject_to_bearing(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec3_t& reproj) const {
     // convert to camera-coordinates
     reproj = rot_cw * pos_w + trans_cw;
@@ -209,6 +240,140 @@ nlohmann::json perspective::to_json() const {
             {"p1", p1_},
             {"p2", p2_},
             {"k3", k3_}};
+}
+
+void perspective::jacobian_xyz_to_cam(const Vec3_t &xyz,
+                                      Mat26_t &jac, const double scale) const {
+
+    // using Matlab auto generated jacs, they are just sooo much faster than cv::projectPoints jacobians
+    const double rx = 0.0;
+    const double ry = 0.0;
+    const double rz = 0.0;
+
+    const double tx = 0.0;
+    const double ty = 0.0;
+    const double tz = 0.0;
+
+    const double X = xyz[0];
+    const double Y = xyz[1];
+    const double Z = xyz[2];
+
+    const double t7 = Y*rz;
+    const double t8 = Z*ry;
+    const double t2 = X-t7+t8+tx;
+    const double t12 = X*rz;
+    const double t13 = Z*rx;
+    const double t3 = Y+t12-t13+ty;
+    const double t4 = Y*rx;
+    const double t10 = X*ry;
+    const double t5 = Z+t4-t10+tz;
+    const double t6 = 1.0/(t5*t5);
+    const double t9 = t2*t2;
+    const double t11 = t6*t9;
+    const double t14 = t3*t3;
+    const double t15 = t6*t14;
+    const double t16 = t11+t15;
+    const double t17 = t16*t16;
+    const double t18 = X*2.0;
+    const double t19 = tx*2.0;
+    const double t20 = Z*ry*2.0;
+    const double t22 = Y*rz*2.0;
+    const double t21 = t18+t19+t20-t22;
+    const double t23 = 1.0/t5;
+    const double t24 = Y*2.0;
+    const double t25 = ty*2.0;
+    const double t26 = X*rz*2.0;
+    const double t28 = Z*rx*2.0;
+    const double t27 = t24+t25+t26-t28;
+    const double t29 = 1.0/(t5*t5*t5);
+    const double t30 = t14*t29*2.0;
+    const double t31 = t9*t29*2.0;
+    const double t32 = t30+t31;
+    const double t33 = k1_*t16;
+    const double t34 = k2_*t17;
+    const double t35 = k3_*t16*t17;
+    const double t36 = t33+t34+t35+1.0;
+    const double t37 = Z*t3*t6*2.0;
+    const double t38 = Y*t14*t29*2.0;
+    const double t39 = Y*t9*t29*2.0;
+    const double t40 = t37+t38+t39;
+    const double t41 = X*t14*t29*2.0;
+    const double t42 = Z*t2*t6*2.0;
+    const double t43 = X*t9*t29*2.0;
+    const double t44 = t41+t42+t43;
+    const double t45 = X*t3*t6*2.0;
+    const double t47 = Y*t2*t6*2.0;
+    const double t46 = t45-t47;
+    const double t48 = k1_*t6*t21;
+    const double t49 = k2_*t6*t16*t21*2.0;
+    const double t50 = k3_*t6*t17*t21*3.0;
+    const double t51 = t48+t49+t50;
+    const double t52 = t23*t36;
+    const double t53 = k1_*t6*t27;
+    const double t54 = k2_*t6*t16*t27*2.0;
+    const double t55 = k3_*t6*t17*t27*3.0;
+    const double t56 = t53+t54+t55;
+    const double t57 = k1_*t32;
+    const double t58 = k2_*t16*t32*2.0;
+    const double t59 = k3_*t17*t32*3.0;
+    const double t60 = t57+t58+t59;
+    const double t61 = Z*t23*t36;
+    const double t62 = k1_*t40;
+    const double t63 = k3_*t17*t40*3.0;
+    const double t64 = k2_*t16*t40*2.0;
+    const double t65 = t62+t63+t64;
+    const double t66 = k1_*t44;
+    const double t67 = k3_*t17*t44*3.0;
+    const double t68 = k2_*t16*t44*2.0;
+    const double t69 = t66+t67+t68;
+    const double t70 = k1_*t46;
+    const double t71 = k2_*t16*t46*2.0;
+    const double t72 = k3_*t17*t46*3.0;
+    const double t73 = t70+t71+t72;
+    const double fx_scaled = scale * fx_;
+    const double fy_scaled = scale * fy_;
+
+    jac(0,0) = fx_scaled*(t52+p1_*t3*t6*2.0+p2_*t6*t21*3.0+t2*t23*t51);
+    jac(0,1) = fx_scaled*(p1_*t2*t6*2.0+p2_*t6*t27+t2*t23*t56);
+    jac(0,2) = -fx_scaled*(p2_*(t30+t9*t29*6.0)+t2*t6*t36+t2*t23*t60+p1_*t2*t3*t29*4.0);
+    jac(0,3) = -fx_scaled*(p2_*(t37+t38+Y*t9*t29*6.0)+t2*t23*t65+Z*p1_*t2*t6*2.0+Y*t2*t6*t36+Y*p1_*t2*t3*t29*4.0);
+    jac(0,4) = fx_scaled*(t61+p2_*(t41+X*t9*t29*6.0+Z*t2*t6*6.0)+t2*t23*t69+Z*p1_*t3*t6*2.0+X*t2*t6*t36+X*p1_*t2*t3*t29*4.0);
+    jac(0,5) = fx_scaled*(p2_*(t45-Y*t2*t6*6.0)-Y*t23*t36+t2*t23*t73+X*p1_*t2*t6*2.0-Y*p1_*t3*t6*2.0);
+    jac(1,0) = fy_scaled*(p2_*t3*t6*2.0+p1_*t6*t21+t3*t23*t51);
+    jac(1,1) = fy_scaled*(t52+p2_*t2*t6*2.0+p1_*t6*t27*3.0+t3*t23*t56);
+    jac(1,2) = -fy_scaled*(p1_*(t31+t14*t29*6.0)+t3*t6*t36+t3*t23*t60+p2_*t2*t3*t29*4.0);
+    jac(1,3) = -fy_scaled*(t61+p1_*(t39+Y*t14*t29*6.0+Z*t3*t6*6.0)+t3*t23*t65+Z*p2_*t2*t6*2.0+Y*t3*t6*t36+Y*p2_*t2*t3*t29*4.0);
+    jac(1,4) = fy_scaled*(p1_*(t42+t43+X*t14*t29*6.0)+t3*t23*t69+Z*p2_*t3*t6*2.0+X*t3*t6*t36+X*p2_*t2*t3*t29*4.0);
+    jac(1,5) = fy_scaled*(-p1_*(t47-X*t3*t6*6.0)+X*t23*t36+t3*t23*t73+X*p2_*t2*t6*2.0-Y*p2_*t3*t6*2.0);
+    jac(1,0) *= -1.;
+//     for (int i=0; i < 1000; ++i) {
+
+//    const cv::Vec3d xyz_cv(xyz[0], xyz[1], xyz[2]);
+//    const cv::Vec3d rvec(0.0,0.0,0.0);
+//    const cv::Vec3d tvec(0.0,0.0,0.0);
+//    cv::Mat im_pts;
+//    cv::Mat jacobian;
+//    cv::projectPoints(xyz_cv, rvec, tvec, cv_cam_matrix_ * scale, cv_dist_params_, im_pts, jacobian);
+//    jac(0,0) = -jacobian.ptr<double>(0)[3];
+//    jac(0,1) = -jacobian.ptr<double>(0)[4];
+//    jac(0,2) = -jacobian.ptr<double>(0)[5];
+//    jac(0,3) = -jacobian.ptr<double>(0)[0];
+//    jac(0,4) = -jacobian.ptr<double>(0)[1];
+//    jac(0,5) = -jacobian.ptr<double>(0)[2];
+
+//    jac(1,0) = -jacobian.ptr<double>(1)[3];
+//    jac(1,1) = -jacobian.ptr<double>(1)[4];
+//    jac(1,2) = -jacobian.ptr<double>(1)[5];
+//    jac(1,3) = -jacobian.ptr<double>(1)[0];
+//    jac(1,4) = -jacobian.ptr<double>(1)[1];
+//    jac(1,5) = -jacobian.ptr<double>(1)[2];
+//     }
+//    t2 = time_now::now();
+//    std::cout<<"jacs ocv: "<<jac<<std::endl;
+
+//    std::cout << "eval time ocv jac : "
+//        << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+//        << " ms\n";
 }
 
 } // namespace camera

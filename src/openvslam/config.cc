@@ -97,6 +97,8 @@ config::config(const YAML::Node& yaml_node, const std::string& config_file_path)
     if (camera_->setup_type_ == camera::setup_type_t::RGBD) {
         depthmap_factor_ = yaml_node_["depthmap_factor"].as<double>(1.0);
     }
+
+    //use_sparse_image_alignment_ = yaml_node_["use_sparse_image_alignment"].as<bool>();
 }
 
 config::~config() {

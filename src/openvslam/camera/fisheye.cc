@@ -18,8 +18,8 @@ fisheye::fisheye(const std::string& name, const setup_type_t& setup_type, const 
       k1_(k1), k2_(k2), k3_(k3), k4_(k4) {
     spdlog::debug("CONSTRUCT: camera::fisheye");
 
-    cv_cam_matrix_ = (cv::Mat_<float>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
-    cv_dist_params_ = (cv::Mat_<float>(4, 1) << k1_, k2_, k3_, k4_);
+    cv_cam_matrix_ = (cv::Mat_<double>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
+    cv_dist_params_ = (cv::Mat_<double>(4, 1) << k1_, k2_, k3_, k4_);
 
     eigen_cam_matrix_ << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1;
     eigen_dist_params_ << k1_, k2_, k3_, k4_;
@@ -207,6 +207,38 @@ bool fisheye::reproject_to_image(const Mat33_t& rot_cw, const Vec3_t& trans_cw, 
             && img_bounds_.min_y_ < reproj(1) && reproj(1) < img_bounds_.max_y_);
 }
 
+bool fisheye::reproject_to_image_distorted(const Mat33_t &rot_cw, const Vec3_t &trans_cw, const Vec3_t &pos_w, Vec2_t &reproj, float &x_right) const {
+    // convert to camera-coordinates
+    const Vec3_t pos_c = rot_cw * pos_w + trans_cw;
+
+    // check if the point is visible
+    if (pos_c(2) <= 0.0) {
+        return false;
+    }
+
+    const double a = pos_c[0] / pos_c[2];
+    const double b = pos_c[1] / pos_c[2];
+    double r2 = a * a + b * b;
+    if (r2 < 1e-7) // avoid div by zero
+        r2 = 1e-7;
+    const double r = sqrt(r2);
+    const double theta = std::atan(r);
+    const double theta2 = theta * theta;
+    const double theta4 = theta2 * theta2;
+    const double theta6 = theta4 * theta2;
+    const double theta8 = theta4 * theta4;
+    const double thetad = theta * (1.0 + k1_ * theta2 + k2_ * theta4 + k3_ * theta6 + k4_ * theta8);
+    const double thetadr2 = thetad / r;
+    reproj(0) = fx_ * thetadr2 * a + cx_;
+    reproj(1) = fy_ * thetadr2 * b + cy_;
+
+    x_right = reproj(0) - focal_x_baseline_ / pos_c[2];
+
+    // check if the point is visible
+    return (0.0 < reproj(0) && reproj(0) < static_cast<double>(cols_)
+            && 0.0 < reproj(1) && reproj(1) < static_cast<double>(rows_));
+}
+
 bool fisheye::reproject_to_bearing(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec3_t& reproj) const {
     // convert to camera-coordinates
     reproj = rot_cw * pos_w + trans_cw;
@@ -247,6 +279,150 @@ nlohmann::json fisheye::to_json() const {
             {"k2", k2_},
             {"k3", k3_},
             {"k4", k4_}};
+}
+
+void fisheye::jacobian_xyz_to_cam(const Vec3_t &xyz, Mat26_t &jac, const double scale) const {
+    // using Matlab auto generated jacs, they are just sooo much faster than cv::projectPoints jacobians
+    const double rx = 0.0;
+    const double ry = 0.0;
+    const double rz = 0.0;
+
+    const double tx = 0.0;
+    const double ty = 0.0;
+    const double tz = 0.0;
+
+    const double X = xyz[0];
+    const double Y = xyz[1];
+    const double Z = xyz[2];
+
+    const double t7 = Y*rz;
+    const double t8 = Z*ry;
+    const double t2 = X-t7+t8+tx;
+    const double t12 = X*rz;
+    const double t13 = Z*rx;
+    const double t3 = Y+t12-t13+ty;
+    const double t4 = Y*rx;
+    const double t10 = X*ry;
+    const double t5 = Z+t4-t10+tz;
+    const double t6 = 1.0/(t5*t5);
+    const double t9 = t2*t2;
+    const double t11 = t6*t9;
+    const double t14 = t3*t3;
+    const double t15 = t6*t14;
+    const double t16 = t11+t15;
+    const double t17 = atan(t16);
+    const double t18 = t17*t17;
+    const double t19 = t18*t18;
+    const double t20 = 1.0/sqrt(t16);
+    const double t21 = t16*t16;
+    const double t22 = t21+1.0;
+    const double t23 = 1.0/t22;
+    const double t24 = X*2.0;
+    const double t25 = tx*2.0;
+    const double t26 = Z*ry*2.0;
+    const double t28 = Y*rz*2.0;
+    const double t27 = t24+t25+t26-t28;
+    const double t29 = 1.0/t5;
+    const double t30 = k1_*t18;
+    const double t31 = k2_*t19;
+    const double t32 = k3_*t18*t19;
+    const double t33 = t19*t19;
+    const double t34 = k4_*t33;
+    const double t35 = t30+t31+t32+t34+1.0;
+    const double t36 = 1.0/(t5*t5*t5);
+    const double t37 = Y*2.0;
+    const double t38 = ty*2.0;
+    const double t39 = X*rz*2.0;
+    const double t41 = Z*rx*2.0;
+    const double t40 = t37+t38+t39-t41;
+    const double t42 = 1.0/pow(t16,3.0/2.0);
+    const double t43 = t9*t36*2.0;
+    const double t44 = t14*t36*2.0;
+    const double t45 = t43+t44;
+    const double t46 = Z*t3*t6*2.0;
+    const double t47 = Y*t9*t36*2.0;
+    const double t48 = Y*t14*t36*2.0;
+    const double t49 = t46+t47+t48;
+    const double t50 = Z*t2*t6*2.0;
+    const double t51 = X*t9*t36*2.0;
+    const double t52 = X*t14*t36*2.0;
+    const double t53 = t50+t51+t52;
+    const double t54 = X*t3*t6*2.0;
+    const double t56 = Y*t2*t6*2.0;
+    const double t55 = t54-t56;
+    const double t57 = k2_*t6*t17*t18*t23*t27*4.0;
+    const double t58 = k3_*t6*t17*t19*t23*t27*6.0;
+    const double t59 = k4_*t6*t17*t18*t19*t23*t27*8.0;
+    const double t60 = k1_*t6*t17*t23*t27*2.0;
+    const double t61 = t57+t58+t59+t60;
+    const double t62 = k2_*t6*t17*t18*t23*t40*4.0;
+    const double t63 = k3_*t6*t17*t19*t23*t40*6.0;
+    const double t64 = k4_*t6*t17*t18*t19*t23*t40*8.0;
+    const double t65 = k1_*t6*t17*t23*t40*2.0;
+    const double t66 = t62+t63+t64+t65;
+    const double t67 = k1_*t17*t23*t45*2.0;
+    const double t68 = k2_*t17*t18*t23*t45*4.0;
+    const double t69 = k3_*t17*t19*t23*t45*6.0;
+    const double t70 = k4_*t17*t18*t19*t23*t45*8.0;
+    const double t71 = t67+t68+t69+t70;
+    const double t72 = k1_*t17*t23*t49*2.0;
+    const double t73 = k2_*t17*t18*t23*t49*4.0;
+    const double t74 = k3_*t17*t19*t23*t49*6.0;
+    const double t75 = k4_*t17*t18*t19*t23*t49*8.0;
+    const double t76 = t72+t73+t74+t75;
+    const double t77 = k1_*t17*t23*t53*2.0;
+    const double t78 = k2_*t17*t18*t23*t53*4.0;
+    const double t79 = k3_*t17*t19*t23*t53*6.0;
+    const double t80 = k4_*t17*t18*t19*t23*t53*8.0;
+    const double t81 = t77+t78+t79+t80;
+    const double t82 = k1_*t17*t23*t55*2.0;
+    const double t83 = k2_*t17*t18*t23*t55*4.0;
+    const double t84 = k3_*t17*t19*t23*t55*6.0;
+    const double t85 = k4_*t17*t18*t19*t23*t55*8.0;
+    const double t86 = t82+t83+t84+t85;
+    const double fx_scaled = scale * fx_;
+    const double fy_scaled = scale * fy_;
+
+    jac(0,0) = fx_scaled*t17*t20*t29*t35+fx_scaled*t2*t17*t20*t29*t61+fx_scaled*t2*t20*t23*t27*t35*t36-fx_scaled*t2*t17*t27*t35*t36*t42*(1.0/2.0);
+    jac(0,1) = fx_scaled*t2*t17*t20*t29*t66+fx_scaled*t2*t20*t23*t35*t36*t40-fx_scaled*t2*t17*t35*t36*t40*t42*(1.0/2.0);
+    jac(0,2) = -fx_scaled*t2*t6*t17*t20*t35-fx_scaled*t2*t17*t20*t29*t71-fx_scaled*t2*t20*t23*t29*t35*t45+fx_scaled*t2*t17*t29*t35*t42*t45*(1.0/2.0);
+    jac(0,3) = -fx_scaled*t2*t17*t20*t29*t76-Y*fx_scaled*t2*t6*t17*t20*t35-fx_scaled*t2*t20*t23*t29*t35*t49+fx_scaled*t2*t17*t29*t35*t42*t49*(1.0/2.0);
+    jac(0,4) = fx_scaled*t2*t17*t20*t29*t81+Z*fx_scaled*t17*t20*t29*t35+X*fx_scaled*t2*t6*t17*t20*t35+fx_scaled*t2*t20*t23*t29*t35*t53-fx_scaled*t2*t17*t29*t35*t42*t53*(1.0/2.0);
+    jac(0,5) = fx_scaled*t2*t17*t20*t29*t86-Y*fx_scaled*t17*t20*t29*t35+fx_scaled*t2*t20*t23*t29*t35*t55-fx_scaled*t2*t17*t29*t35*t42*t55*(1.0/2.0);
+    jac(1,0) = fy_scaled*t3*t17*t20*t29*t61+fy_scaled*t3*t20*t23*t27*t35*t36-fy_scaled*t3*t17*t27*t35*t36*t42*(1.0/2.0);
+    jac(1,1) = fy_scaled*t17*t20*t29*t35+fy_scaled*t3*t17*t20*t29*t66+fy_scaled*t3*t20*t23*t35*t36*t40-fy_scaled*t3*t17*t35*t36*t40*t42*(1.0/2.0);
+    jac(1,2) = -fy_scaled*t3*t6*t17*t20*t35-fy_scaled*t3*t17*t20*t29*t71-fy_scaled*t3*t20*t23*t29*t35*t45+fy_scaled*t3*t17*t29*t35*t42*t45*(1.0/2.0);
+    jac(1,3) = -fy_scaled*t3*t17*t20*t29*t76-Z*fy_scaled*t17*t20*t29*t35-Y*fy_scaled*t3*t6*t17*t20*t35-fy_scaled*t3*t20*t23*t29*t35*t49+fy_scaled*t3*t17*t29*t35*t42*t49*(1.0/2.0);
+    jac(1,4) = fy_scaled*t3*t17*t20*t29*t81+X*fy_scaled*t3*t6*t17*t20*t35+fy_scaled*t3*t20*t23*t29*t35*t53-fy_scaled*t3*t17*t29*t35*t42*t53*(1.0/2.0);
+    jac(1,5) = fy_scaled*t3*t17*t20*t29*t86+X*fy_scaled*t17*t20*t29*t35+fy_scaled*t3*t20*t23*t29*t35*t55-fy_scaled*t3*t17*t29*t35*t42*t55*(1.0/2.0);
+
+    jac *= -1.;
+//    const cv::Vec3d xyz_cv_(xyz[0],xyz[1],xyz[2]);
+//    cv::Mat xyz_cv = cv::Mat::zeros(1,1,CV_64FC3);
+//    xyz_cv.at<cv::Vec3d>(0,0) = xyz_cv_;
+//    const cv::Vec3d rvec(0.0,0.0,0.0);
+//    const cv::Vec3d tvec(0.0,0.0,0.0);
+//    cv::Mat im_pts;
+//    cv::Mat jacobian;
+//    cv::fisheye::projectPoints(xyz_cv,im_pts, cv::Mat(rvec), cv::Mat(tvec),
+//                               cv_cam_matrix_ * scale, cv_dist_params_, 0.0, jacobian);
+//    jac.setZero();
+//    jac(0,0) = -jacobian.ptr<double>(0)[3];
+//    jac(0,1) = -jacobian.ptr<double>(0)[4];
+//    jac(0,2) = -jacobian.ptr<double>(0)[5];
+//    jac(0,3) = -jacobian.ptr<double>(0)[0];
+//    jac(0,4) = -jacobian.ptr<double>(0)[1];
+//    jac(0,5) = -jacobian.ptr<double>(0)[2];
+
+//    jac(1,0) = -jacobian.ptr<double>(1)[3];
+//    jac(1,1) = -jacobian.ptr<double>(1)[4];
+//    jac(1,2) = -jacobian.ptr<double>(1)[5];
+//    jac(1,3) = -jacobian.ptr<double>(1)[0];
+//    jac(1,4) = -jacobian.ptr<double>(1)[1];
+//    jac(1,5) = -jacobian.ptr<double>(1)[2];
+
+//    std::cout<<"jac ocv: "<<jac<<std::endl;
+
 }
 
 } // namespace camera

@@ -36,10 +36,16 @@ keyframe::keyframe(const frame& frm, map_database* map_db, bow_database* bow_db)
       level_sigma_sq_(frm.level_sigma_sq_), inv_level_sigma_sq_(frm.inv_level_sigma_sq_),
       // observations
       landmarks_(frm.landmarks_),
-      // databases
-      map_db_(map_db), bow_db_(bow_db), bow_vocab_(frm.bow_vocab_) {
+      // databases,
+      map_db_(map_db), bow_db_(bow_db), bow_vocab_(frm.bow_vocab_),
+      // if sparse alignment if used
+      save_image_pyramid_(frm.save_image_pyramid_) {
     // set pose parameters (cam_pose_wc_, cam_center_) using frm.cam_pose_cw_
     set_cam_pose(frm.cam_pose_cw_);
+    image_pyramid_.resize(frm.image_pyramid_.size());
+    for (unsigned int i = 0; i < frm.image_pyramid_.size(); ++i) {
+        image_pyramid_[i] = frm.image_pyramid_[i].clone();
+    }
 }
 
 keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const double timestamp,
@@ -48,6 +54,7 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
                    const std::vector<cv::KeyPoint>& undist_keypts, const eigen_alloc_vector<Vec3_t>& bearings,
                    const std::vector<float>& stereo_x_right, const std::vector<float>& depths, const cv::Mat& descriptors,
                    const unsigned int num_scale_levels, const float scale_factor,
+                   const std::vector<cv::Mat>& image_pyramid, const bool save_image_pyramid,
                    bow_vocabulary* bow_vocab, bow_database* bow_db, map_database* map_db)
     : // meta information
       id_(id), src_frm_id_(src_frm_id), timestamp_(timestamp),
@@ -67,12 +74,17 @@ keyframe::keyframe(const unsigned int id, const unsigned int src_frm_id, const d
       // others
       landmarks_(std::vector<landmark*>(num_keypts, nullptr)),
       // databases
-      map_db_(map_db), bow_db_(bow_db), bow_vocab_(bow_vocab) {
+      map_db_(map_db), bow_db_(bow_db), bow_vocab_(bow_vocab),
+      // if sparse alignment if used
+      save_image_pyramid_(save_image_pyramid) {
     // compute BoW (bow_vec_, bow_feat_vec_) using descriptors_
     compute_bow();
     // set pose parameters (cam_pose_wc_, cam_center_) using cam_pose_cw_
     set_cam_pose(cam_pose_cw);
-
+    image_pyramid_.resize(image_pyramid.size());
+    for (unsigned int i = 0; i < image_pyramid.size(); ++i) {
+        image_pyramid_[i] = image_pyramid[i].clone();
+    }
     // TODO: should set the pointers of landmarks_ using add_landmark()
 
     // TODO: should compute connected_keyfrms_and_weights_
@@ -132,7 +144,8 @@ nlohmann::json keyframe::to_json() const {
             // graph information
             {"span_parent", spanning_parent ? spanning_parent->id_ : -1},
             {"span_children", spanning_child_ids},
-            {"loop_edges", loop_edge_ids}};
+            {"loop_edges", loop_edge_ids},
+            {"save_image_pyramid"}, save_image_pyramid_};
 }
 
 void keyframe::set_cam_pose(const Mat44_t& cam_pose_cw) {

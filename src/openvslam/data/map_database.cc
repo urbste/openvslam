@@ -253,10 +253,12 @@ void map_database::register_keyframe(camera_database* cam_db, bow_vocabulary* bo
     const auto num_scale_levels = json_keyfrm.at("n_scale_levels").get<unsigned int>();
     const auto scale_factor = json_keyfrm.at("scale_factor").get<float>();
 
+    const bool save_img_pyramid = json_keyfrm.at("save_image_pyramid").get<bool>();
+    std::vector<cv::Mat> img_pyramid;
     // Construct a new object
     auto keyfrm = new data::keyframe(id, src_frm_id, timestamp, cam_pose_cw, camera, depth_thr,
                                      num_keypts, keypts, undist_keypts, bearings, stereo_x_right, depths, descriptors,
-                                     num_scale_levels, scale_factor, bow_vocab, bow_db, this);
+                                     num_scale_levels, scale_factor, img_pyramid, save_img_pyramid, bow_vocab, bow_db, this);
 
     // Append to map database
     assert(!keyframes_.count(id));

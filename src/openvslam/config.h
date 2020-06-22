@@ -36,6 +36,9 @@ public:
 
     //! depthmap factor (pixel_value / depthmap_factor = true_depth)
     double depthmap_factor_ = 1.0;
+
+    //! user sparse image alinger
+    bool use_sparse_image_alignment_ = true;
 };
 
 } // namespace openvslam

@@ -79,7 +79,11 @@ public:
 
     bool reproject_to_image(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec2_t& reproj, float& x_right) const override final;
 
+    bool reproject_to_image_distorted(const Mat33_t &rot_cw, const Vec3_t &trans_cw, const Vec3_t &pos_w, Vec2_t &reproj, float &x_right) const override final;
+
     bool reproject_to_bearing(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec3_t& reproj) const override final;
+
+    void jacobian_xyz_to_cam(const Vec3_t& xyz, Mat26_t& jac, const double scale) const override final;
 
     nlohmann::json to_json() const override final;
 

@@ -7,56 +7,109 @@
 #include "openvslam/data/landmark.h"
 #include "openvslam/feature/orb_extractor.h"
 #include "openvslam/match/stereo.h"
+#include "openvslam/match/sparse_feature_aligner.h"
 
 #include <thread>
 
 #include <spdlog/spdlog.h>
+#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 namespace openvslam {
 namespace data {
 
 std::atomic<unsigned int> frame::next_id_{0};
 
+frame::frame(const frame &frm) :
+    id_(frm.id_),
+    bow_vocab_(frm.bow_vocab_), bow_vec_(frm.bow_vec_), bow_feat_vec_(frm.bow_feat_vec_),
+    extractor_(frm.extractor_), extractor_right_(frm.extractor_right_),
+    timestamp_(frm.timestamp_),
+    camera_(frm.camera_),
+    depth_thr_(frm.depth_thr_),
+    num_keypts_(frm.num_keypts_),
+    keypts_(frm.keypts_), keypts_right_(frm.keypts_right_), keypt_indices_in_cells_(frm.keypt_indices_in_cells_),
+    undist_keypts_(frm.undist_keypts_), bearings_(frm.bearings_),
+    stereo_x_right_(frm.stereo_x_right_),
+    depths_(frm.depths_),
+    descriptors_(frm.descriptors_.clone()), descriptors_right_(frm.descriptors_right_.clone()),
+    landmarks_(frm.landmarks_), outlier_flags_(frm.outlier_flags_),
+    cam_pose_cw_is_valid_(frm.cam_pose_cw_is_valid_),
+    cam_pose_cw_(frm.cam_pose_cw_),
+    ref_keyfrm_(frm.ref_keyfrm_),
+    num_scale_levels_(frm.num_scale_levels_),
+    scale_factor_(frm.scale_factor_),
+    log_scale_factor_(frm.log_scale_factor_),
+    scale_factors_(frm.scale_factors_),
+    inv_scale_factors_(frm.inv_scale_factors_),
+    level_sigma_sq_(frm.level_sigma_sq_),
+    inv_level_sigma_sq_(frm.inv_level_sigma_sq_),
+    save_image_pyramid_(frm.save_image_pyramid_),
+    features_extracted_(frm.features_extracted_),
+    rot_cw_(frm.rot_cw_), trans_cw_(frm.trans_cw_),
+    rot_wc_(frm.rot_wc_), cam_center_(frm.cam_center_)
+{
+    // copy the image pyramid
+    for (const cv::Mat &mat: frm.image_pyramid_) {
+        image_pyramid_.push_back(mat.clone());
+    }
+}
+
 frame::frame(const cv::Mat& img_gray, const double timestamp,
              feature::orb_extractor* extractor, bow_vocabulary* bow_vocab,
-             camera::base* camera, const float depth_thr,
+             camera::base* camera, const float depth_thr, const bool save_image_pyramid,
              const cv::Mat& mask)
     : id_(next_id_++), bow_vocab_(bow_vocab), extractor_(extractor), extractor_right_(nullptr),
-      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr) {
+      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr), save_image_pyramid_(save_image_pyramid),
+      img_gray_(img_gray), mask_(mask), features_extracted_(false){
     // Get ORB scale
     update_orb_info();
 
-    // Extract ORB feature
-    extract_orb(img_gray, mask);
-    num_keypts_ = keypts_.size();
-    if (keypts_.empty()) {
-        spdlog::warn("frame {}: cannot extract any keypoints", id_);
-    }
+    // clone image pyramid
+    //if (save_image_pyramid_) {
+    //    extractor_->get_image_pyramid(img_gray_, image_pyramid_);
+    //}
 
-    // Undistort keypoints
-    camera_->undistort_keypoints(keypts_, undist_keypts_);
 
-    // Ignore stereo parameters
-    stereo_x_right_ = std::vector<float>(num_keypts_, -1);
-    depths_ = std::vector<float>(num_keypts_, -1);
 
-    // Convert to bearing vector
-    camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
 
-    // Initialize association with 3D points
-    landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
-    outlier_flags_ = std::vector<bool>(num_keypts_, false);
 
-    // Assign all the keypoints into grid
-    assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+//    // Extract ORB feature
+//    if (extract_features) {
+//        extract_orb(img_gray, mask);
+//        num_keypts_ = keypts_.size();
+//        if (keypts_.empty()) {
+//            spdlog::warn("frame {}: cannot extract any keypoints", id_);
+//        }
+
+//        // Undistort keypoints
+//        camera_->undistort_keypoints(keypts_, undist_keypts_);
+
+//        // Ignore stereo parameters
+//        stereo_x_right_ = std::vector<float>(num_keypts_, -1);
+//        depths_ = std::vector<float>(num_keypts_, -1);
+
+//        // Convert to bearing vector
+//        camera->convert_keypoints_to_bearings(undist_keypts_, bearings_);
+
+//        // Initialize association with 3D points
+//        landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
+//        outlier_flags_ = std::vector<bool>(num_keypts_, false);
+
+//        // Assign all the keypoints into grid
+//        assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+//    }
 }
 
 frame::frame(const cv::Mat& left_img_gray, const cv::Mat& right_img_gray, const double timestamp,
              feature::orb_extractor* extractor_left, feature::orb_extractor* extractor_right,
              bow_vocabulary* bow_vocab, camera::base* camera, const float depth_thr,
+             const bool save_image_pyramid,
              const cv::Mat& mask)
     : id_(next_id_++), bow_vocab_(bow_vocab), extractor_(extractor_left), extractor_right_(extractor_right),
-      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr) {
+      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr), save_image_pyramid_(save_image_pyramid),
+      features_extracted_(false){
     // Get ORB scale
     update_orb_info();
 
@@ -89,14 +142,16 @@ frame::frame(const cv::Mat& left_img_gray, const cv::Mat& right_img_gray, const 
 
     // Assign all the keypoints into grid
     assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+    features_extracted_ = true;
 }
 
 frame::frame(const cv::Mat& img_gray, const cv::Mat& img_depth, const double timestamp,
              feature::orb_extractor* extractor, bow_vocabulary* bow_vocab,
-             camera::base* camera, const float depth_thr,
+             camera::base* camera, const float depth_thr, const bool save_image_pyramid,
              const cv::Mat& mask)
     : id_(next_id_++), bow_vocab_(bow_vocab), extractor_(extractor), extractor_right_(nullptr),
-      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr) {
+      timestamp_(timestamp), camera_(camera), depth_thr_(depth_thr), save_image_pyramid_(save_image_pyramid),
+      features_extracted_(false){
     // Get ORB scale
     update_orb_info();
 
@@ -122,6 +177,7 @@ frame::frame(const cv::Mat& img_gray, const cv::Mat& img_depth, const double tim
 
     // Assign all the keypoints into grid
     assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+    features_extracted_ = true;
 }
 
 void frame::set_cam_pose(const Mat44_t& cam_pose_cw) {
@@ -170,10 +226,16 @@ void frame::compute_bow() {
 }
 
 bool frame::can_observe(landmark* lm, const float ray_cos_thr,
-                        Vec2_t& reproj, float& x_right, unsigned int& pred_scale_level) const {
+                        Vec2_t& reproj, float& x_right, unsigned int& pred_scale_level, const bool proj_distorted) const {
     const Vec3_t pos_w = lm->get_pos_in_world();
 
-    const bool in_image = camera_->reproject_to_image(rot_cw_, trans_cw_, pos_w, reproj, x_right);
+    bool in_image;
+    if (proj_distorted) {
+        in_image = match::project_to_image_distorted(this, cam_pose_cw_, pos_w, reproj);
+    } else {
+        in_image = camera_->reproject_to_image(rot_cw_, trans_cw_, pos_w, reproj, x_right);
+    }
+
     if (!in_image) {
         return false;
     }
@@ -281,6 +343,76 @@ void frame::compute_stereo_from_depth(const cv::Mat& right_img_depth) {
 
         depths_.at(idx) = depth;
         stereo_x_right_.at(idx) = undist_keypt.pt.x - camera_->focal_x_baseline_ / depth;
+    }
+}
+
+void frame::run_feature_extraction(const bool clear_features) {
+    if (features_extracted_) {
+        spdlog::info("Frame {} already has features.", id_);
+        return;
+    }
+
+    if (clear_features) {
+        reset_features();
+    }
+    extract_orb(img_gray_, mask_);
+    num_keypts_ = keypts_.size();
+    if (keypts_.empty()) {
+        spdlog::warn("frame {}: cannot extract any keypoints", id_);
+    }
+
+    // Undistort keypoints
+    camera_->undistort_keypoints(keypts_, undist_keypts_);
+
+    // Ignore stereo parameters
+    stereo_x_right_ = std::vector<float>(num_keypts_, -1);
+    depths_ = std::vector<float>(num_keypts_, -1);
+
+    // Convert to bearing vector
+    camera_->convert_keypoints_to_bearings(undist_keypts_, bearings_);
+    if (landmarks_.size() == 0) {
+        // Initialize association with 3D points
+        landmarks_ = std::vector<landmark*>(num_keypts_, nullptr);
+        outlier_flags_ = std::vector<bool>(num_keypts_, false);
+    } else {
+        size_t num_lms = landmarks_.size();
+        landmarks_.resize(num_keypts_);
+        outlier_flags_.resize(num_keypts_);
+        for (size_t i = num_lms; i < num_keypts_; ++i) {
+            landmarks_[i] = nullptr;
+            outlier_flags_[i] = false;
+        }
+    }
+
+    // Assign all the keypoints into grid
+    assign_keypoints_to_grid(camera_, undist_keypts_, keypt_indices_in_cells_);
+    compute_bow();
+    features_extracted_ = true;
+}
+
+void frame::reset_features() {
+    num_keypts_ = 0;
+    bow_feat_vec_.clear();
+    keypts_.clear();
+    undist_keypts_.clear();
+    bearings_.clear();
+    outlier_flags_.clear();
+    landmarks_.clear();
+    depths_.clear();
+    stereo_x_right_.clear();
+    features_extracted_ = false;
+}
+
+void frame::create_image_pyramid() {
+    image_pyramid_.resize(extractor_->get_num_scale_levels());
+    image_pyramid_.at(0) = img_gray_.clone();
+    for (unsigned int level = 1;
+         level < extractor_->get_num_scale_levels(); ++level) {
+        // determine the size of an image
+        const double scale = scale_factors_.at(level);
+        const cv::Size size(std::round(img_gray_.cols * 1.0 / scale), std::round(img_gray_.rows * 1.0 / scale));
+        // resize
+        cv::resize(image_pyramid_.at(level - 1), image_pyramid_.at(level), size, 0, 0, cv::INTER_LINEAR);
     }
 }
 

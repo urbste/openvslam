@@ -3,6 +3,7 @@
 
 #include "openvslam/feature/orb_params.h"
 #include "openvslam/feature/orb_extractor_node.h"
+#include "openvslam/data/frame.h"
 
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
@@ -71,6 +72,11 @@ public:
     //! Get inverted sigma square for all levels
     std::vector<float> get_inv_level_sigma_sq() const;
 
+    void get_image_pyramid(std::vector<cv::Mat>& img_pyramid);
+
+    void get_image_pyramid(const cv::Mat image,
+                           std::vector<cv::Mat>& img_pyramid);
+
     //! Image pyramid
     std::vector<cv::Mat> image_pyramid_;
 
@@ -85,10 +91,14 @@ private:
     void create_rectangle_mask(const unsigned int cols, const unsigned int rows);
 
     //! Compute image pyramid
-    void compute_image_pyramid(const cv::Mat& image);
+    void compute_image_pyramid(const cv::Mat image);
 
     //! Compute fast keypoints for cells in each image pyramid
     void compute_fast_keypoints(std::vector<std::vector<cv::KeyPoint>>& all_keypts, const cv::Mat& mask) const;
+
+    //! Compute fast keypoints for direct method. In this case
+    //! some keypoints already exist
+    void compute_fast_keypoints_for_direct(std::vector<cv::KeyPoint>& all_keypts, const cv::Mat& mask) const;
 
     //! Pick computed keypoints on the image uniformly
     std::vector<cv::KeyPoint> distribute_keypoints_via_tree(const std::vector<cv::KeyPoint>& keypts_to_distribute,

@@ -15,6 +15,7 @@
 #include <g2o/solvers/eigen/linear_solver_eigen.h>
 #include <g2o/solvers/dense/linear_solver_dense.h>
 #include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/core/sparse_optimizer_terminate_action.h>
 
 namespace openvslam {
 namespace optimize {
@@ -31,7 +32,7 @@ unsigned int pose_optimizer::optimize(data::frame& frm) const {
 
     ::g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(algorithm);
-
+    //optimizer.setVerbose(true);
     unsigned int num_init_obs = 0;
 
     // 2. frameをg2oのvertexに変換してoptimizerにセットする
@@ -95,6 +96,11 @@ unsigned int pose_optimizer::optimize(data::frame& frm) const {
     for (unsigned int trial = 0; trial < num_trials_; ++trial) {
         optimizer.initializeOptimization();
         optimizer.optimize(num_each_iter_);
+        ::g2o::SparseOptimizerTerminateAction* terminateAction = 0;
+            terminateAction = new ::g2o::SparseOptimizerTerminateAction;
+            terminateAction->setGainThreshold(1e-6);
+        terminateAction->setMaxIterations(num_each_iter_);
+        optimizer.addPostIterationAction(terminateAction);
 
         num_bad_obs = 0;
 

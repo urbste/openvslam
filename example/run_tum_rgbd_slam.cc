@@ -76,7 +76,7 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
             if (!no_sleep && i < frames.size() - 1) {
                 const auto wait_time = frames.at(i + 1).timestamp_ - (frame.timestamp_ + track_time);
                 if (0.0 < wait_time) {
-                    std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(wait_time * 1e6)));
+                    //std::this_thread::sleep_for(std::chrono::microseconds(static_cast<unsigned int>(wait_time * 1e6)));
                 }
             }
 

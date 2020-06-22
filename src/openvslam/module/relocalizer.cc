@@ -25,7 +25,10 @@ relocalizer::~relocalizer() {
 }
 
 bool relocalizer::relocalize(data::frame& curr_frm) {
-    curr_frm.compute_bow();
+    if (!curr_frm.features_extracted_) {
+        curr_frm.reset_features();
+        curr_frm.run_feature_extraction();
+    }
 
     // acquire relocalization candidates
     const auto reloc_candidates = bow_db_->acquire_relocalization_candidates(&curr_frm);

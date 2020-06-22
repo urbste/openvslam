@@ -46,31 +46,34 @@ void mono_perspective_reproj_edge::linearizeOplus() {
     const auto x = pos_c(0);
     const auto y = pos_c(1);
     const auto z = pos_c(2);
-    const auto z_sq = z * z;
+    const auto z_inv = 1.0 / z;
+    const auto z_inv_sq = z_inv * z_inv;
+    const auto z_inv_sq_fx = fx_ * z_inv_sq;
+    const auto z_inv_sq_fy = fy_ * z_inv_sq;
 
     const Mat33_t rot_cw = cam_pose_cw.rotation().toRotationMatrix();
 
-    _jacobianOplusXi(0, 0) = -fx_ * rot_cw(0, 0) / z + fx_ * x * rot_cw(2, 0) / z_sq;
-    _jacobianOplusXi(0, 1) = -fx_ * rot_cw(0, 1) / z + fx_ * x * rot_cw(2, 1) / z_sq;
-    _jacobianOplusXi(0, 2) = -fx_ * rot_cw(0, 2) / z + fx_ * x * rot_cw(2, 2) / z_sq;
+    _jacobianOplusXi(0, 0) = -rot_cw(0, 0) * z_inv_sq_fx + x * rot_cw(2, 0) * z_inv_sq_fx;
+    _jacobianOplusXi(0, 1) = -rot_cw(0, 1) * z_inv_sq_fx + x * rot_cw(2, 1) * z_inv_sq_fx;
+    _jacobianOplusXi(0, 2) = -rot_cw(0, 2) * z_inv_sq_fx + x * rot_cw(2, 2) * z_inv_sq_fx;
 
-    _jacobianOplusXi(1, 0) = -fy_ * rot_cw(1, 0) / z + fy_ * y * rot_cw(2, 0) / z_sq;
-    _jacobianOplusXi(1, 1) = -fy_ * rot_cw(1, 1) / z + fy_ * y * rot_cw(2, 1) / z_sq;
-    _jacobianOplusXi(1, 2) = -fy_ * rot_cw(1, 2) / z + fy_ * y * rot_cw(2, 2) / z_sq;
+    _jacobianOplusXi(1, 0) = -rot_cw(1, 0) * z_inv_sq_fy + y * rot_cw(2, 0) * z_inv_sq_fy;
+    _jacobianOplusXi(1, 1) = -rot_cw(1, 1) * z_inv_sq_fy + y * rot_cw(2, 1) * z_inv_sq_fy;
+    _jacobianOplusXi(1, 2) = -rot_cw(1, 2) * z_inv_sq_fy + y * rot_cw(2, 2) * z_inv_sq_fy;
 
-    _jacobianOplusXj(0, 0) = x * y / z_sq * fx_;
-    _jacobianOplusXj(0, 1) = -(1.0 + (x * x / z_sq)) * fx_;
+    _jacobianOplusXj(0, 0) = x * y * z_inv_sq_fx;
+    _jacobianOplusXj(0, 1) = -fx_ - x * x * z_inv_sq_fx;
     _jacobianOplusXj(0, 2) = y / z * fx_;
-    _jacobianOplusXj(0, 3) = -1.0 / z * fx_;
+    _jacobianOplusXj(0, 3) = -1.0 * z_inv * fx_;
     _jacobianOplusXj(0, 4) = 0.0;
-    _jacobianOplusXj(0, 5) = x / z_sq * fx_;
+    _jacobianOplusXj(0, 5) = x * z_inv_sq_fx;
 
-    _jacobianOplusXj(1, 0) = (1.0 + y * y / z_sq) * fy_;
-    _jacobianOplusXj(1, 1) = -x * y / z_sq * fy_;
-    _jacobianOplusXj(1, 2) = -x / z * fy_;
+    _jacobianOplusXj(1, 0) = fy_ + z_inv_sq_fy * y * y;
+    _jacobianOplusXj(1, 1) = -x * y * z_inv_sq_fy;
+    _jacobianOplusXj(1, 2) = -x * z_inv * fy_;
     _jacobianOplusXj(1, 3) = 0.0;
     _jacobianOplusXj(1, 4) = -1.0 / z * fy_;
-    _jacobianOplusXj(1, 5) = y / z_sq * fy_;
+    _jacobianOplusXj(1, 5) = y * z_inv_sq_fy;
 }
 
 stereo_perspective_reproj_edge::stereo_perspective_reproj_edge()

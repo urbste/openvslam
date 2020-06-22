@@ -134,7 +134,8 @@ protected:
     bool initialize();
 
     //! Track the current frame
-    bool track_current_frame();
+    bool track_current_frame(const bool track_match_based,
+                             const bool track_sparse);
 
     //! Update the motion model using the current and last frames
     void update_motion_model();
@@ -253,6 +254,13 @@ protected:
 
     //! Pause of the tracking module is requested or not
     bool pause_is_requested_ = false;
+
+    //! use sparse image alignment flag
+    bool use_sparse_image_alignment_ = false;
+
+    std::set<data::landmark*> direct_map_points_cache_;
+
+    bool extract_features_ = true;
 };
 
 } // namespace openvslam

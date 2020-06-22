@@ -38,6 +38,8 @@ using Mat34_t = MatRC_t<3, 4>;
 
 using MatX_t = Eigen::MatrixXd;
 
+using Mat26_t = MatRC_t<2, 6>;
+
 // Eigen vector types
 
 template<size_t R>

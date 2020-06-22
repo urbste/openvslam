@@ -11,10 +11,15 @@
 #include "openvslam/match/projection.h"
 #include "openvslam/util/image_converter.h"
 
+#include <opencv2/highgui.hpp>
+
 #include <chrono>
+#include <iostream>
 #include <unordered_map>
 
 #include <spdlog/spdlog.h>
+
+using time_now = std::chrono::steady_clock;
 
 namespace openvslam {
 
@@ -23,7 +28,8 @@ tracking_module::tracking_module(const std::shared_ptr<config>& cfg, system* sys
     : cfg_(cfg), camera_(cfg->camera_), system_(system), map_db_(map_db), bow_vocab_(bow_vocab), bow_db_(bow_db),
       initializer_(cfg->camera_->setup_type_, map_db, bow_db, cfg->yaml_node_),
       frame_tracker_(camera_, 10), relocalizer_(bow_db_), pose_optimizer_(),
-      keyfrm_inserter_(cfg_->camera_->setup_type_, cfg_->true_depth_thr_, map_db, bow_db, 0, cfg_->camera_->fps_) {
+      keyfrm_inserter_(cfg_->camera_->setup_type_, cfg_->true_depth_thr_, map_db, bow_db, 0, cfg_->camera_->fps_),
+      use_sparse_image_alignment_(cfg_->use_sparse_image_alignment_){
     spdlog::debug("CONSTRUCT: tracking_module");
 
     extractor_left_ = new feature::orb_extractor(cfg_->orb_params_);
@@ -83,12 +89,21 @@ Mat44_t tracking_module::track_monocular_image(const cv::Mat& img, const double 
 
     // create current frame object
     if (tracking_state_ == tracker_state_t::NotInitialized || tracking_state_ == tracker_state_t::Initializing) {
-        curr_frm_ = data::frame(img_gray_, timestamp, ini_extractor_left_, bow_vocab_, camera_, cfg_->true_depth_thr_, mask);
+        curr_frm_ = data::frame(img_gray_, timestamp, ini_extractor_left_,
+                                bow_vocab_, camera_, cfg_->true_depth_thr_,
+                                use_sparse_image_alignment_, mask);
     }
     else {
-        curr_frm_ = data::frame(img_gray_, timestamp, extractor_left_, bow_vocab_, camera_, cfg_->true_depth_thr_, mask);
+        curr_frm_ = data::frame(img_gray_, timestamp, extractor_left_,
+                                bow_vocab_, camera_, cfg_->true_depth_thr_,
+                                use_sparse_image_alignment_, mask);
     }
-
+    if (!use_sparse_image_alignment_) {
+        curr_frm_.run_feature_extraction(true);
+    }
+    if (use_sparse_image_alignment_) {
+        curr_frm_.create_image_pyramid();
+    }
     track();
 
     const auto end = std::chrono::system_clock::now();
@@ -107,8 +122,11 @@ Mat44_t tracking_module::track_stereo_image(const cv::Mat& left_img_rect, const 
     util::convert_to_grayscale(right_img_gray, camera_->color_order_);
 
     // create current frame object
-    curr_frm_ = data::frame(img_gray_, right_img_gray, timestamp, extractor_left_, extractor_right_, bow_vocab_, camera_, cfg_->true_depth_thr_, mask);
-
+    curr_frm_ = data::frame(img_gray_, right_img_gray, timestamp, extractor_left_,
+                            extractor_right_, bow_vocab_, camera_, cfg_->true_depth_thr_, use_sparse_image_alignment_, mask);
+    if (!use_sparse_image_alignment_) {
+        curr_frm_.run_feature_extraction(true);
+    }
     track();
 
     const auto end = std::chrono::system_clock::now();
@@ -127,8 +145,11 @@ Mat44_t tracking_module::track_RGBD_image(const cv::Mat& img, const cv::Mat& dep
     util::convert_to_true_depth(img_depth, cfg_->depthmap_factor_);
 
     // create current frame object
-    curr_frm_ = data::frame(img_gray_, img_depth, timestamp, extractor_left_, bow_vocab_, camera_, cfg_->true_depth_thr_, mask);
-
+    curr_frm_ = data::frame(img_gray_, img_depth, timestamp, extractor_left_,
+                            bow_vocab_, camera_, cfg_->true_depth_thr_, use_sparse_image_alignment_, mask);
+    if (!use_sparse_image_alignment_) {
+        curr_frm_.run_feature_extraction(true);
+    }
     track();
 
     const auto end = std::chrono::system_clock::now();
@@ -156,11 +177,14 @@ void tracking_module::reset() {
     last_reloc_frm_id_ = 0;
 
     tracking_state_ = tracker_state_t::NotInitialized;
+
+    direct_map_points_cache_.clear();
 }
 
 void tracking_module::track() {
     if (tracking_state_ == tracker_state_t::NotInitialized) {
         tracking_state_ = tracker_state_t::Initializing;
+        extract_features_ = true;
     }
 
     last_tracking_state_ = tracking_state_;
@@ -175,6 +199,7 @@ void tracking_module::track() {
     std::lock_guard<std::mutex> lock(data::map_database::mtx_database_);
 
     if (tracking_state_ == tracker_state_t::Initializing) {
+        curr_frm_.run_feature_extraction(true);
         if (!initialize()) {
             return;
         }
@@ -201,14 +226,40 @@ void tracking_module::track() {
         // set the reference keyframe of the current frame
         curr_frm_.ref_keyfrm_ = ref_keyfrm_;
 
-        auto succeeded = track_current_frame();
+        auto succeeded = track_current_frame(false, true);
 
         // update the local map and optimize the camera pose of the current frame
-        if (succeeded) {
-            update_local_map();
-            succeeded = optimize_current_frame_with_local_map();
+        if (succeeded)
+        {
+            if (!curr_frm_.features_extracted_)
+            {
+                auto t1 = time_now::now();
+                unsigned int num_tracked = frame_tracker_.sparse_feat_alignment_track(
+                                curr_frm_, ref_keyfrm_, local_landmarks_, direct_map_points_cache_);
+                auto t2 = time_now::now();
+                std::cout << "time for sparse feature search : "
+                    << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+                    << " ms\n";
+                if (num_tracked > 30) {
+                    succeeded = true;
+                    num_tracked_lms_ = num_tracked; // otherwise the keyframe inserter will idle
+                    update_local_map();
+                }
+                // if this fails run feature extraction and track local map
+                // with features
+                if (!succeeded) {
+                    curr_frm_.run_feature_extraction(true);
+                    succeeded = track_current_frame(false, false);
+                    if (succeeded)
+                        succeeded = optimize_current_frame_with_local_map();
+                    if (!succeeded) {
+                        spdlog::warn("All tracking attempts failes. Aborting.");
+                    }
+                }
+            } else {
+                succeeded = optimize_current_frame_with_local_map();
+            }
         }
-
         // update the motion model
         if (succeeded) {
             update_motion_model();
@@ -236,6 +287,7 @@ void tracking_module::track() {
 
         // check to insert the new keyframe derived from the current frame
         if (succeeded && new_keyframe_is_needed()) {
+            // now we run full feature tracking as we are inserting a new KF
             insert_new_keyframe();
         }
 
@@ -254,7 +306,7 @@ void tracking_module::track() {
     }
 
     // update last frame
-    last_frm_ = curr_frm_;
+    last_frm_ = data::frame(curr_frm_);
 }
 
 bool tracking_module::initialize() {
@@ -277,18 +329,30 @@ bool tracking_module::initialize() {
     return true;
 }
 
-bool tracking_module::track_current_frame() {
+
+bool tracking_module::track_current_frame(const bool track_match_based,
+                                          const bool track_sparse) {
     bool succeeded = false;
     if (tracking_state_ == tracker_state_t::Tracking) {
         // Tracking mode
-        if (velocity_is_valid_ && last_reloc_frm_id_ + 2 < curr_frm_.id_) {
-            // if the motion model is valid
-            succeeded = frame_tracker_.motion_based_track(curr_frm_, last_frm_, velocity_);
+        if (velocity_is_valid_ && last_reloc_frm_id_ + 2 < curr_frm_.id_ && !track_match_based) {
+            if (use_sparse_image_alignment_ && track_sparse) {
+                auto t1 = time_now::now();
+                succeeded = frame_tracker_.sparse_img_alignment_track(curr_frm_, last_frm_, velocity_);
+                auto t2 = time_now::now();
+                std::cout << "time for sparse img alignment : "
+                    << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+                    << " ms\n";
+
+            } else {
+                // if the motion model is valid
+                succeeded = frame_tracker_.motion_based_track(curr_frm_, last_frm_, velocity_);
+            }
         }
         if (!succeeded) {
             succeeded = frame_tracker_.bow_match_based_track(curr_frm_, last_frm_, ref_keyfrm_);
         }
-        if (!succeeded) {
+        if (!succeeded || track_match_based) {
             succeeded = frame_tracker_.robust_match_based_track(curr_frm_, last_frm_, ref_keyfrm_);
         }
     }
@@ -607,6 +671,10 @@ bool tracking_module::new_keyframe_is_needed() const {
 }
 
 void tracking_module::insert_new_keyframe() {
+    // this can happen in sparse image alignment
+    if (!curr_frm_.features_extracted_) {
+        curr_frm_.run_feature_extraction(false);
+    }
     // insert the new keyframe
     const auto ref_keyfrm = keyfrm_inserter_.insert_new_keyframe(curr_frm_);
     // set the reference keyframe with the new keyframe

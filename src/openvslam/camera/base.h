@@ -160,9 +160,18 @@ public:
     //! (reprojected to inside of image -> true, to outside of image -> false)
     virtual bool reproject_to_image(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec2_t& reproj, float& x_right) const = 0;
 
+    //! Reproject the specified 3D point to image using camera pose and projection model
+    //! (reprojected to inside of image -> true, to outside of image -> false)
+    //! Here we project into the distorted image
+    virtual bool reproject_to_image_distorted(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec2_t& reproj, float& x_right) const = 0;
+
     //! Reproject the specified 3D point to bearing vector using camera pose (Not depends on any projection models)
     //! (reprojected to inside of image -> true, to outside of image -> false)
     virtual bool reproject_to_bearing(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec3_t& reproj) const = 0;
+
+    //! projection jacobian
+    //! needed for sparse image alignment
+    virtual void jacobian_xyz_to_cam(const Vec3_t& xyz, Mat26_t& jac, const double scale) const = 0;
 
     //! Encode camera information as JSON
     virtual nlohmann::json to_json() const = 0;

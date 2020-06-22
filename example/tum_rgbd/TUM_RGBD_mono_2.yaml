@@ -49,3 +49,8 @@ PangolinViewer.viewpoint_x: 0
 PangolinViewer.viewpoint_y: -0.9
 PangolinViewer.viewpoint_z: -1.9
 PangolinViewer.viewpoint_f: 400
+
+#===========================#
+# New features              #
+#===========================#
+Tracking.UseSparseImageAlignment: 1

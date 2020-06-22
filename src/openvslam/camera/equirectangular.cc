@@ -83,6 +83,10 @@ bool equirectangular::reproject_to_image(const Mat33_t& rot_cw, const Vec3_t& tr
     return true;
 }
 
+bool equirectangular::reproject_to_image_distorted(const Mat33_t &rot_cw, const Vec3_t &trans_cw, const Vec3_t &pos_w, Vec2_t &reproj, float &x_right) const {
+    return reproject_to_image(rot_cw, trans_cw, pos_w, reproj, x_right);
+}
+
 bool equirectangular::reproject_to_bearing(const Mat33_t& rot_cw, const Vec3_t& trans_cw, const Vec3_t& pos_w, Vec3_t& reproj) const {
     // convert to camera-coordinates
     reproj = (rot_cw * pos_w + trans_cw).normalized();
@@ -102,5 +106,70 @@ nlohmann::json equirectangular::to_json() const {
             {"num_grid_rows", num_grid_rows_}};
 }
 
+void equirectangular::jacobian_xyz_to_cam(const Vec3_t &xyz, Mat26_t &jac, const double scale) const {
+    // using Matlab auto generated jacs, they are just sooo much faster than cv::projectPoints jacobians
+    const double rx = 0.0;
+    const double ry = 0.0;
+    const double rz = 0.0;
+
+    const double tx = 0.0;
+    const double ty = 0.0;
+    const double tz = 0.0;
+
+    const double X = xyz[0];
+    const double Y = xyz[1];
+    const double Z = xyz[2];
+
+    const double t5 = Y*rz;
+    const double t6 = Z*ry;
+    const double t7 = X-t5+t6+tx;
+    const double t2 = fabs(t7);
+    const double t9 = X*rz;
+    const double t10 = Z*rx;
+    const double t11 = Y+t9-t10+ty;
+    const double t3 = fabs(t11);
+    const double t13 = X*ry;
+    const double t14 = Y*rx;
+    const double t15 = Z-t13+t14+tz;
+    const double t4 = fabs(t15);
+    const double t8 = t2*t2;
+    const double t12 = t3*t3;
+    const double t16 = t4*t4;
+    const double t17 = t8+t12+t16;
+    const double t18 = 1.0/t17;
+    const double t19 = 1.0/M_PI;
+    const double t20 = t7*t7;
+    const double t21 = t18*t20;
+    const double t22 = t15*t15;
+    const double t23 = t18*t22;
+    const double t24 = t21+t23;
+    const double t25 = 1.0/t24;
+    const double t26 = t11*t11;
+    const double t30 = t18*t26;
+    const double t27 = -t30+1.0;
+    const double t28 = 1.0/sqrt(t27);
+    const double t29 = 1.0/pow(t17,3.0/2.0);
+    const double t31 = 1.0/sqrt(t17);
+    const double t32 = (t15/fabs(t15));
+    const double t33 = (t11/fabs(t11));
+    const double t34 = (t7/fabs(t7));
+
+    const double scaled_cols = cols_ * scale;
+    const double scaled_rows = rows_ * scale;
+
+    jac(0,0) = scaled_cols*t15*t18*t19*t25*(1.0/2.0);
+    jac(0,1) = 0.0;
+    jac(0,2) = scaled_cols*t7*t18*t19*t25*(-1.0/2.0);
+    jac(0,3) = Y*scaled_cols*t7*t18*t19*t25*(-1.0/2.0);
+    jac(0,4) = scaled_cols*t18*t19*t22*t25*(Z/t15+X*t7*1.0/(t15*t15))*(1.0/2.0);
+    jac(0,5) = Y*scaled_cols*t15*t18*t19*t25*(-1.0/2.0);
+    jac(1,0) = scaled_rows*t2*t11*t19*t28*t29*t34;
+    jac(1,1) = -scaled_rows*t19*t28*(t31-t3*t11*t29*t33);
+    jac(1,2) = scaled_rows*t4*t11*t19*t28*t29*t32;
+    jac(1,3) = scaled_rows*t19*t28*(Z*t31+t11*t29*(Y*t4*t32*2.0-Z*t3*t33*2.0)*(1.0/2.0));
+    jac(1,4) = scaled_rows*t11*t19*t28*t29*(X*t4*t32*2.0-Z*t2*t34*2.0)*(-1.0/2.0);
+    jac(1,5) = -scaled_rows*t19*t28*(X*t31-t11*t29*(X*t3*t33*2.0-Y*t2*t34*2.0)*(1.0/2.0));
+
+}
 } // namespace camera
 } // namespace openvslam

@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "openvslam/feature/orb_extractor.h"
 #include "openvslam/feature/orb_point_pairs.h"
 #include "openvslam/util/trigonometric.h"
+#include "openvslam/data/frame.h"
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -65,6 +66,7 @@ orb_extractor::orb_extractor(const orb_params& orb_params)
     initialize();
 }
 
+
 void orb_extractor::extract(const cv::_InputArray& in_image, const cv::_InputArray& in_image_mask,
                             std::vector<cv::KeyPoint>& keypts, const cv::_OutputArray& out_descriptors) {
     if (in_image.empty()) {
@@ -85,7 +87,12 @@ void orb_extractor::extract(const cv::_InputArray& in_image, const cv::_InputArr
     }
 
     std::vector<std::vector<cv::KeyPoint>> all_keypts;
-
+    all_keypts.resize(orb_params_.num_levels_);
+    if (keypts.size() != 0) {
+        for (const auto& kp : keypts) {
+            all_keypts[kp.octave].push_back(kp);
+        }
+    }
     // select mask to use
     if (!in_image_mask.empty()) {
         // Use image_mask if it is available
@@ -260,7 +267,7 @@ void orb_extractor::create_rectangle_mask(const unsigned int cols, const unsigne
     }
 }
 
-void orb_extractor::compute_image_pyramid(const cv::Mat& image) {
+void orb_extractor::compute_image_pyramid(const cv::Mat image) {
     image_pyramid_.at(0) = image;
     for (unsigned int level = 1; level < orb_params_.num_levels_; ++level) {
         // determine the size of an image
@@ -271,8 +278,154 @@ void orb_extractor::compute_image_pyramid(const cv::Mat& image) {
     }
 }
 
-void orb_extractor::compute_fast_keypoints(std::vector<std::vector<cv::KeyPoint>>& all_keypts, const cv::Mat& mask) const {
-    all_keypts.resize(orb_params_.num_levels_);
+
+void orb_extractor::compute_fast_keypoints_for_direct(
+        std::vector<cv::KeyPoint>& all_keypts,
+        const cv::Mat& mask) const {
+
+    // An anonymous function which checks mask(image or rectangle)
+    auto is_in_mask = [&mask](const unsigned int y, const unsigned int x, const float scale_factor) {
+        return mask.at<unsigned char>(y * scale_factor, x * scale_factor) == 0;
+    };
+    cv::Rect rect;
+    auto is_in_rect = [&rect](const cv::KeyPoint pt) {
+      return rect.contains(pt.pt);
+    };
+
+    constexpr unsigned int overlap = 6;
+    constexpr unsigned int cell_size = 64;
+
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
+    for (unsigned int level = 0; level < 1; ++level) {
+        const float scale_factor = 1;
+
+        constexpr unsigned int min_border_x = orb_patch_radius_;
+        constexpr unsigned int min_border_y = orb_patch_radius_;
+        const unsigned int max_border_x = image_pyramid_[0].cols - orb_patch_radius_;
+        const unsigned int max_border_y = image_pyramid_[0].rows - orb_patch_radius_;
+
+        const unsigned int width = max_border_x - min_border_x;
+        const unsigned int height = max_border_y - min_border_y;
+
+        const unsigned int num_cols = std::ceil(width / cell_size) + 1;
+        const unsigned int num_rows = std::ceil(height / cell_size) + 1;
+
+        std::vector<cv::KeyPoint> keypts_to_distribute;
+        keypts_to_distribute.reserve(orb_params_.max_num_keypts_ * 10);
+
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
+        for (unsigned int i = 0; i < num_rows; ++i) {
+            const unsigned int min_y = min_border_y + i * cell_size;
+            if (max_border_y - overlap <= min_y) {
+                continue;
+            }
+            unsigned int max_y = min_y + cell_size + overlap;
+            if (max_border_y < max_y) {
+                max_y = max_border_y;
+            }
+
+#ifdef USE_OPENMP
+#pragma omp parallel for
+#endif
+            for (unsigned int j = 0; j < num_cols; ++j) {
+                const unsigned int min_x = min_border_x + j * cell_size;
+                if (max_border_x - overlap <= min_x) {
+                    continue;
+                }
+                unsigned int max_x = min_x + cell_size + overlap;
+                if (max_border_x < max_x) {
+                    max_x = max_border_x;
+                }
+
+                // Pass FAST computation if one of the corners of a patch is in the mask
+                if (!mask.empty()) {
+                    if (is_in_mask(min_y, min_x, scale_factor) || is_in_mask(max_y, min_x, scale_factor)
+                        || is_in_mask(min_y, max_x, scale_factor) || is_in_mask(max_y, max_x, scale_factor)) {
+                        continue;
+                    }
+                }
+                rect = cv::Rect(cv::Point(min_x, min_y), cv::Point(max_x, max_y));
+                // check if there are already points int that cell
+                bool contains = false;
+                for (const auto& pt : all_keypts) {
+                    if (is_in_rect(pt)) {
+                        contains = true;
+                        break;
+                    }
+                }
+                if (contains)
+                    continue;
+
+                std::vector<cv::KeyPoint> keypts_in_cell;
+                cv::FAST(image_pyramid_[0].rowRange(min_y, max_y).colRange(min_x, max_x),
+                         keypts_in_cell, orb_params_.ini_fast_thr_, true);
+
+                // Re-compute FAST keypoint with reduced threshold if enough keypoint was not got
+                if (keypts_in_cell.empty()) {
+                    cv::FAST(image_pyramid_[0].rowRange(min_y, max_y).colRange(min_x, max_x),
+                             keypts_in_cell, orb_params_.min_fast_thr, true);
+                }
+
+                if (keypts_in_cell.empty()) {
+                    continue;
+                }
+
+                // Collect keypoints for every scale
+#ifdef USE_OPENMP
+#pragma omp critical
+#endif
+                {
+                    for (auto& keypt : keypts_in_cell) {
+                        keypt.pt.x += j * cell_size;
+                        keypt.pt.y += i * cell_size;
+                        // Check if the keypoint is in the mask
+                        if (!mask.empty() && is_in_mask(min_border_y + keypt.pt.y, min_border_x + keypt.pt.x, scale_factor)) {
+                            continue;
+                        }
+                        keypts_to_distribute.push_back(keypt);
+                    }
+                }
+            }
+        }
+
+        std::vector<cv::KeyPoint> keypts_at_level;
+        keypts_at_level.reserve(orb_params_.max_num_keypts_);
+
+        // Distribute keypoints via tree
+        keypts_at_level = distribute_keypoints_via_tree(keypts_to_distribute,
+                                                        min_border_x, max_border_x, min_border_y, max_border_y,
+                                                        num_keypts_per_level_.at(level));
+
+        // Keypoint size is patch size modified by the scale factor
+        const unsigned int scaled_patch_size = fast_patch_size_ * 1.0;
+
+        for (auto& keypt : keypts_at_level) {
+            // Translation correction (scale will be corrected after ORB description)
+            keypt.pt.x += min_border_x;
+            keypt.pt.y += min_border_y;
+            // Set the other information
+            keypt.octave = level;
+            keypt.size = scaled_patch_size;
+            all_keypts.push_back(keypt);
+        }
+    }
+
+    // Compute orientations
+    compute_orientation(image_pyramid_[0], all_keypts);
+}
+
+void orb_extractor::compute_fast_keypoints(
+        std::vector<std::vector<cv::KeyPoint>>& all_keypts,
+        const cv::Mat& mask) const {
+
+    cv::Rect rect;
+    auto is_in_rect = [&rect](const cv::KeyPoint pt) {
+      return rect.contains(pt.pt);
+    };
 
     // An anonymous function which checks mask(image or rectangle)
     auto is_in_mask = [&mask](const unsigned int y, const unsigned int x, const float scale_factor) {
@@ -335,7 +488,18 @@ void orb_extractor::compute_fast_keypoints(std::vector<std::vector<cv::KeyPoint>
                         continue;
                     }
                 }
-
+                rect = cv::Rect(cv::Point(min_x*scale_factor, min_y*scale_factor),
+                                cv::Point(max_x*scale_factor, max_y*scale_factor));
+                // check if there are already points int that cell
+                bool contains = false;
+                for (const auto& pt : all_keypts.at(level)) {
+                    if (is_in_rect(pt)) {
+                        contains = true;
+                        break;
+                    }
+                }
+                if (contains)
+                    continue;
                 std::vector<cv::KeyPoint> keypts_in_cell;
                 cv::FAST(image_pyramid_.at(level).rowRange(min_y, max_y).colRange(min_x, max_x),
                          keypts_in_cell, orb_params_.ini_fast_thr_, true);
@@ -368,11 +532,8 @@ void orb_extractor::compute_fast_keypoints(std::vector<std::vector<cv::KeyPoint>
             }
         }
 
-        std::vector<cv::KeyPoint>& keypts_at_level = all_keypts.at(level);
-        keypts_at_level.reserve(orb_params_.max_num_keypts_);
-
         // Distribute keypoints via tree
-        keypts_at_level = distribute_keypoints_via_tree(keypts_to_distribute,
+        std::vector<cv::KeyPoint> keypts_at_level = distribute_keypoints_via_tree(keypts_to_distribute,
                                                         min_border_x, max_border_x, min_border_y, max_border_y,
                                                         num_keypts_per_level_.at(level));
 
@@ -386,6 +547,7 @@ void orb_extractor::compute_fast_keypoints(std::vector<std::vector<cv::KeyPoint>
             // Set the other information
             keypt.octave = level;
             keypt.size = scaled_patch_size;
+            all_keypts.at(level).push_back(keypt);
         }
     }
 
@@ -699,6 +861,23 @@ void orb_extractor::compute_orb_descriptor(const cv::KeyPoint& keypt, const cv::
 
 #undef GET_VALUE
 #undef COMPARE_ORB_POINTS
+}
+
+void orb_extractor::get_image_pyramid(std::vector<cv::Mat> &img_pyramid){
+    img_pyramid = image_pyramid_;
+}
+
+void orb_extractor::get_image_pyramid(const cv::Mat image,
+                                      std::vector<cv::Mat> &img_pyramid){
+    if (image_pyramid_.size() == 0) {
+        image_pyramid_.resize(orb_params_.num_levels_);
+        compute_image_pyramid(image);
+    }
+    img_pyramid.clear();
+    img_pyramid.resize(image_pyramid_.size());
+    for (int i = 0; i < orb_params_.num_levels_; ++i) {
+        img_pyramid[i] = image_pyramid_[i].clone();
+    }
 }
 
 } // namespace feature
