@@ -875,7 +875,7 @@ void orb_extractor::get_image_pyramid(const cv::Mat image,
     }
     img_pyramid.clear();
     img_pyramid.resize(image_pyramid_.size());
-    for (int i = 0; i < orb_params_.num_levels_; ++i) {
+    for (unsigned int i = 0; i < orb_params_.num_levels_; ++i) {
         img_pyramid[i] = image_pyramid_[i].clone();
     }
 }
