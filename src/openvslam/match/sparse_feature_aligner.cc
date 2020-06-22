@@ -3,6 +3,7 @@
 #include "openvslam/camera/perspective.h"
 #include "openvslam/camera/equirectangular.h"
 #include "openvslam/camera/fisheye.h"
+#include "openvslam/camera/radial_division.h".h"
 
 #include <opencv2/core.hpp>
 
@@ -33,6 +34,11 @@ bool project_to_image_distorted(
         is_visible = c->reproject_to_image_distorted(world_to_cam.block<3,3>(0,0), world_to_cam.block<3,1>(0,3),
                               pt3, projection, x_right);
     }break;
+    case camera::model_type_t::RadialDivision: {
+        auto c = static_cast<camera::radial_division*>(curr_frame->camera_);
+        is_visible = c->reproject_to_image_distorted(world_to_cam.block<3,3>(0,0), world_to_cam.block<3,1>(0,3),
+                              pt3, projection, x_right);
+    }break;
     }
     return is_visible;
 }
@@ -59,11 +65,15 @@ void convert_keypt_to_bearing(
         const cv::KeyPoint undist_kp = c->undistort_keypoint(kp);
         bearing = c->convert_keypoint_to_bearing(undist_kp);
     }break;
+    case camera::model_type_t::RadialDivision: {
+        auto c = static_cast<camera::radial_division*>(curr_frame->camera_);
+        const cv::KeyPoint undist_kp = c->undistort_keypoint(kp);
+        bearing = c->convert_keypoint_to_bearing(undist_kp);
+    }break;
     }
 }
 
-bool sparse_feature_aligner::find_projection_direct(
-        data::keyframe *ref, data::frame *curr,
+bool sparse_feature_aligner::find_projection_direct(data::keyframe *ref, data::frame *curr,
         data::landmark *mp, Vec2_t &px_curr,
         int &search_level) {
     Mat22_t ACR;

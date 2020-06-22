@@ -343,7 +343,10 @@ bool tracking_module::track_current_frame(const bool track_match_based,
                 std::cout << "time for sparse img alignment : "
                     << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
                     << " ms\n";
-
+                if (!succeeded) {
+                    // if the motion model is valid
+                    succeeded = frame_tracker_.motion_based_track(curr_frm_, last_frm_, velocity_);
+                }
             } else {
                 // if the motion model is valid
                 succeeded = frame_tracker_.motion_based_track(curr_frm_, last_frm_, velocity_);

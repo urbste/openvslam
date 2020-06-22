@@ -48,7 +48,7 @@ private:
 
     const optimize::pose_optimizer pose_optimizer_;
 
-    int cache_hit_thresh_ = 200;
+    int cache_hit_thresh_ = 180;
 
     std::unique_ptr<match::sparse_image_aligner> sparse_image_align_;
 };

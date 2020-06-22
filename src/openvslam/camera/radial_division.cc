@@ -141,17 +141,17 @@ bool radial_division::reproject_to_image_distorted(const Mat33_t& rot_cw, const 
     const Vec3_t pos_c = rot_cw * pos_w + trans_cw;
 
     // check if the point is visible
-    if (pos_c(2) <= 0.0) {
+    if (pos_c(2) <= std::numeric_limits<double>::epsilon()) {
         return false;
     }
 
     // do distorted projection
     const double xs = pos_c[0] / pos_c[2];
     const double ys = pos_c[1] / pos_c[2];
-    const double r2 = xs * xs + ys * ys;
+    const double r2 = (xs * xs + ys * ys) * distortion_;
 
-    const double denom = 2.0 * distortion_ * r2;
-    const double inner = 1.0 - 4.0 * distortion_ * r2;
+    const double denom = 2.0 * r2;
+    const double inner = 1.0 - 4.0 * r2;
 
     if (std::abs(denom) < std::numeric_limits<double>::epsilon() || inner < 0.0) {
         reproj(0) = fx_ * xs + cx_;
@@ -241,75 +241,78 @@ void radial_division::jacobian_xyz_to_cam(const Vec3_t &xyz,
     const double t11 = t6*t9;
     const double t14 = t3*t3;
     const double t15 = t6*t14;
-    const double t16 = t11+t15+1.0E-10;
+    const double t16 = t11+t15;
+    const double t17 = 1.0/t16;
     const double t20 = distortion_*t16*4.0;
-    const double t17 = -t20+1.0;
-    const double t18 = 1.0/t16;
+    const double t18 = -t20+1.0;
     const double t19 = 1.0/distortion_;
-    const double t21 = sqrt(t17);
+    const double t21 = sqrt(t18);
     const double t22 = t21-1.0;
     const double t23 = X*2.0;
     const double t24 = tx*2.0;
     const double t25 = Z*ry*2.0;
-    const double t61 = Y*rz*2.0;
-    const double t26 = t23+t24+t25-t61;
+    const double t51 = Y*rz*2.0;
+    const double t26 = t23+t24+t25-t51;
     const double t27 = 1.0/(t5*t5*t5);
-    const double t28 = 1.0/sqrt(t17);
+    const double t28 = 1.0/sqrt(t18);
     const double t29 = 1.0/(t16*t16);
     const double t30 = Y*2.0;
     const double t31 = ty*2.0;
     const double t32 = X*rz*2.0;
-    const double t62 = Z*rx*2.0;
-    const double t33 = t30+t31+t32-t62;
-    const double t34 = 1.0/t5;
-    const double t35 = t9*t27*2.0;
-    const double t36 = t14*t27*2.0;
-    const double t37 = t35+t36;
-    const double t38 = Z*t3*t6*2.0;
-    const double t39 = Y*t9*t27*2.0;
-    const double t40 = Y*t14*t27*2.0;
-    const double t41 = t38+t39+t40;
-    const double t42 = Z*t2*t6*2.0;
-    const double t43 = X*t9*t27*2.0;
-    const double t44 = X*t14*t27*2.0;
-    const double t45 = t42+t43+t44;
-    const double t46 = t6*t9*1.0E10;
-    const double t47 = t6*t14*1.0E10;
-    const double t48 = t46+t47+1.0;
-    const double t51 = distortion_*t48;
-    const double t49 = -t51+2.5E9;
-    const double t50 = 1.0/t48;
-    const double t52 = sqrt(t49);
-    const double t53 = t52*2.0E-5;
-    const double t54 = t53-1.0;
-    const double t55 = X*ty;
-    const double t56 = X*X;
-    const double t57 = rz*t56;
-    const double t58 = Y*Y;
-    const double t59 = rz*t58;
-    const double t64 = Y*tx;
-    const double t65 = X*Z*rx;
-    const double t66 = Y*Z*ry;
-    const double t60 = t55+t57+t59-t64-t65-t66;
-    const double t63 = 1.0/sqrt(t49);
-    const double t67 = 1.0/(t48*t48);
+    const double t52 = Z*rx*2.0;
+    const double t33 = t30+t31+t32-t52;
+    const double t34 = X*X;
+    const double t35 = Y*Y;
+    const double t36 = rz*rz;
+    const double t37 = Z*Z;
+    const double t38 = 1.0/t5;
+    const double t39 = Z*t3*t6*2.0;
+    const double t40 = Y*t9*t27*2.0;
+    const double t41 = Y*t14*t27*2.0;
+    const double t42 = t39+t40+t41;
+    const double t43 = Z*t2*t6*2.0;
+    const double t44 = X*t9*t27*2.0;
+    const double t45 = X*t14*t27*2.0;
+    const double t46 = t43+t44+t45;
+    const double t47 = X*ty;
+    const double t48 = rz*t34;
+    const double t49 = rz*t35;
+    const double t68 = Y*tx;
+    const double t69 = X*Z*rx;
+    const double t70 = Y*Z*ry;
+    const double t50 = t47+t48+t49-t68-t69-t70;
+    const double t53 = X*tx*2.0;
+    const double t54 = Y*ty*2.0;
+    const double t55 = tx*tx;
+    const double t56 = ty*ty;
+    const double t57 = t34*t36;
+    const double t58 = t35*t36;
+    const double t59 = rx*rx;
+    const double t60 = t37*t59;
+    const double t61 = ry*ry;
+    const double t62 = t37*t61;
+    const double t63 = X*Z*ry*2.0;
+    const double t64 = X*rz*ty*2.0;
+    const double t65 = Z*ry*tx*2.0;
+    const double t66 = t34+t35+t53+t54+t55+t56+t57+t58+t60+t62+t63+t64+t65-Y*Z*rx*2.0-Y*rz*tx*2.0-Z*rx*ty*2.0-X*Z*rx*rz*2.0-Y*Z*ry*rz*2.0;
+    const double t67 = 1.0/t66;
 
     const double fx_scaled = scale * fx_;
     const double fy_scaled = scale * fy_;
-
-    jac(0,0) = fx_scaled*t18*t19*t22*t34*(-1.0/2.0)+fx_scaled*t2*t18*t26*t27*t28+fx_scaled*t2*t19*t22*t26*t27*t29*(1.0/2.0);
-    jac(0,1) = fx_scaled*t2*t18*t27*t28*t33+fx_scaled*t2*t19*t22*t27*t29*t33*(1.0/2.0);
-    jac(0,2) = fx_scaled*t2*t6*t18*t19*t22*(1.0/2.0)-fx_scaled*t2*t18*t28*t34*t37-fx_scaled*t2*t19*t22*t29*t34*t37*(1.0/2.0);
-    jac(0,3) = -fx_scaled*t2*t18*t28*t34*t41+Y*fx_scaled*t2*t6*t18*t19*t22*(1.0/2.0)-fx_scaled*t2*t19*t22*t29*t34*t41*(1.0/2.0);
-    jac(0,4) = fx_scaled*t2*t18*t28*t34*t45-Z*fx_scaled*t18*t19*t22*t34*(1.0/2.0)-X*fx_scaled*t2*t6*t18*t19*t22*(1.0/2.0)+fx_scaled*t2*t19*t22*t29*t34*t45*(1.0/2.0);
-    jac(0,5) = fx_scaled*t2*t27*t50*t60*t63*1.0E15+Y*fx_scaled*t19*t34*t50*t54*5.0E9+fx_scaled*t2*t19*t27*t54*t60*t67*1.0E20;
-    jac(1,0) = fy_scaled*t3*t18*t26*t27*t28+fy_scaled*t3*t19*t22*t26*t27*t29*(1.0/2.0);
-    jac(1,1) = fy_scaled*t18*t19*t22*t34*(-1.0/2.0)+fy_scaled*t3*t18*t27*t28*t33+fy_scaled*t3*t19*t22*t27*t29*t33*(1.0/2.0);
-    jac(1,2) = fy_scaled*t3*t6*t18*t19*t22*(1.0/2.0)-fy_scaled*t3*t18*t28*t34*t37-fy_scaled*t3*t19*t22*t29*t34*t37*(1.0/2.0);
-    jac(1,3) = -fy_scaled*t3*t18*t28*t34*t41+Z*fy_scaled*t18*t19*t22*t34*(1.0/2.0)+Y*fy_scaled*t3*t6*t18*t19*t22*(1.0/2.0)-fy_scaled*t3*t19*t22*t29*t34*t41*(1.0/2.0);
-    jac(1,4) = fy_scaled*t3*t18*t28*t34*t45-X*fy_scaled*t3*t6*t18*t19*t22*(1.0/2.0)+fy_scaled*t3*t19*t22*t29*t34*t45*(1.0/2.0);
-    jac(1,5) = fy_scaled*t3*t27*t50*t60*t63*1.0E15-X*fy_scaled*t19*t34*t50*t54*5.0E9+fy_scaled*t3*t19*t27*t54*t60*t67*1.0E20;
-    jac(1,0) *= -1.;
+    jac.setZero();
+    jac(0,0) = fx_scaled*t17*t19*t22*t38*(-1.0/2.0)+fx_scaled*t2*t17*t26*t27*t28+fx_scaled*t2*t19*t22*t26*t27*t29*(1.0/2.0);
+    jac(0,1) = fx_scaled*t2*t17*t27*t28*t33+fx_scaled*t2*t19*t22*t27*t29*t33*(1.0/2.0);
+    jac(0,2) = fx_scaled*t2*t19*t22*t28*t67*(1.0/2.0);
+    jac(0,3) = -fx_scaled*t2*t17*t28*t38*t42+Y*fx_scaled*t2*t6*t17*t19*t22*(1.0/2.0)-fx_scaled*t2*t19*t22*t29*t38*t42*(1.0/2.0);
+    jac(0,4) = fx_scaled*t2*t17*t28*t38*t46-Z*fx_scaled*t17*t19*t22*t38*(1.0/2.0)-X*fx_scaled*t2*t6*t17*t19*t22*(1.0/2.0)+fx_scaled*t2*t19*t22*t29*t38*t46*(1.0/2.0);
+    jac(0,5) = fx_scaled*t2*t17*t27*t28*t50*2.0+Y*fx_scaled*t17*t19*t22*t38*(1.0/2.0)+fx_scaled*t2*t19*t22*t27*t29*t50;
+    jac(1,0) = fy_scaled*t3*t17*t26*t27*t28+fy_scaled*t3*t19*t22*t26*t27*t29*(1.0/2.0);
+    jac(1,1) = fy_scaled*t17*t19*t22*t38*(-1.0/2.0)+fy_scaled*t3*t17*t27*t28*t33+fy_scaled*t3*t19*t22*t27*t29*t33*(1.0/2.0);
+    jac(1,2) = fy_scaled*t3*t19*t22*t28*t67*(1.0/2.0);
+    jac(1,3) = -fy_scaled*t3*t17*t28*t38*t42+Z*fy_scaled*t17*t19*t22*t38*(1.0/2.0)+Y*fy_scaled*t3*t6*t17*t19*t22*(1.0/2.0)-fy_scaled*t3*t19*t22*t29*t38*t42*(1.0/2.0);
+    jac(1,4) = fy_scaled*t3*t17*t28*t38*t46-X*fy_scaled*t3*t6*t17*t19*t22*(1.0/2.0)+fy_scaled*t3*t19*t22*t29*t38*t46*(1.0/2.0);
+    jac(1,5) = fy_scaled*t3*t17*t27*t28*t50*2.0-X*fy_scaled*t17*t19*t22*t38*(1.0/2.0)+fy_scaled*t3*t19*t22*t27*t29*t50;
+    jac *= -1.0;
 
 }
 

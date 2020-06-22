@@ -43,7 +43,7 @@ bool keyframe_inserter::new_keyframe_is_needed(const data::frame& curr_frm, cons
     constexpr unsigned int num_tracked_lms_thr = 15;
     float lms_ratio_thr = 0.9;
     if (curr_frm.image_pyramid_.size() > 0)
-        lms_ratio_thr = 0.7;
+        lms_ratio_thr = 0.9;
     // 条件A1: 前回のキーフレーム挿入からmax_num_frames_以上経過していたらキーフレームを追加する
     const bool cond_a1 = frm_id_of_last_keyfrm_ + max_num_frms_ <= curr_frm.id_;
     // 条件A2: min_num_frames_以上経過していて,mapping moduleが待機状態であればキーフレームを追加する

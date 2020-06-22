@@ -4,6 +4,7 @@
 #include "openvslam/camera/perspective.h"
 #include "openvslam/camera/fisheye.h"
 #include "openvslam/camera/equirectangular.h"
+#include "openvslam/camera/radial_division.h"
 
 #include <g2o/types/slam3d/se3quat.h>
 #include <opencv2/core.hpp>
@@ -69,8 +70,16 @@ size_t sparse_image_aligner::run(
         have_ref_patch_cache_ = false;
         n_iter_ = iterations[level_];
         optimize(T_cur_from_ref);
-    }
 
+        //if (norm_max(x_) <= eps_ && level_ <= 1 ) {
+        //    break;
+        //}
+    }
+//    if (error_increased_) {
+//        // if this happens we tell tracking that we were not successfull
+//        std::cout<<"Error increased in sparse align, returning to feature method.\n";
+//        return 0;
+//    }
     TCR = T_cur_from_ref.to_homogeneous_matrix();
     return n_meas_ / IMAGE_ALIGN_PATCH_AREA;
 }
@@ -126,6 +135,10 @@ void sparse_image_aligner::precomputeReferencePatches() {
         }break;
         case camera::model_type_t::Equirectangular: {
             auto c = static_cast<camera::equirectangular*>(ref_frame_->camera_);
+            c->jacobian_xyz_to_cam(xyz_ref, frame_jac, scale);
+        }break;
+        case camera::model_type_t::RadialDivision: {
+            auto c = static_cast<camera::radial_division*>(ref_frame_->camera_);
             c->jacobian_xyz_to_cam(xyz_ref, frame_jac, scale);
         }break;
         }
@@ -270,9 +283,9 @@ double sparse_image_aligner::computeResiduals(
 
                 // robustification
                 double weight = 1.0;
-                if (use_weights_) {
-                    weight = huber_loss(res, 5);
-                }
+                //if (use_weights_) {
+                //    weight = huber_loss(res, 4);
+                //}
 
                 chi2 += res * res * weight;
                 n_meas_++;
@@ -369,6 +382,7 @@ void sparse_image_aligner::optimizeGaussNewton(g2o::SE3Quat& model) {
 
         // check if error increased since last optimization
         if ((iter_ > 0 && new_chi2 > 1.2 * chi2_) || stop_) {
+            error_increased_ = true;
             if (verbose_) {
                 std::cout <<  "It. "<< iter_
                            <<"\t Failure"

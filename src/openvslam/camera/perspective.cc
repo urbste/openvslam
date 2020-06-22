@@ -332,7 +332,7 @@ void perspective::jacobian_xyz_to_cam(const Vec3_t &xyz,
     const double t73 = t70+t71+t72;
     const double fx_scaled = scale * fx_;
     const double fy_scaled = scale * fy_;
-
+    jac.setZero();
     jac(0,0) = fx_scaled*(t52+p1_*t3*t6*2.0+p2_*t6*t21*3.0+t2*t23*t51);
     jac(0,1) = fx_scaled*(p1_*t2*t6*2.0+p2_*t6*t27+t2*t23*t56);
     jac(0,2) = -fx_scaled*(p2_*(t30+t9*t29*6.0)+t2*t6*t36+t2*t23*t60+p1_*t2*t3*t29*4.0);
@@ -345,7 +345,7 @@ void perspective::jacobian_xyz_to_cam(const Vec3_t &xyz,
     jac(1,3) = -fy_scaled*(t61+p1_*(t39+Y*t14*t29*6.0+Z*t3*t6*6.0)+t3*t23*t65+Z*p2_*t2*t6*2.0+Y*t3*t6*t36+Y*p2_*t2*t3*t29*4.0);
     jac(1,4) = fy_scaled*(p1_*(t42+t43+X*t14*t29*6.0)+t3*t23*t69+Z*p2_*t3*t6*2.0+X*t3*t6*t36+X*p2_*t2*t3*t29*4.0);
     jac(1,5) = fy_scaled*(-p1_*(t47-X*t3*t6*6.0)+X*t23*t36+t3*t23*t73+X*p2_*t2*t6*2.0-Y*p2_*t3*t6*2.0);
-    jac(1,0) *= -1.;
+    jac *= -1.0;
 //     for (int i=0; i < 1000; ++i) {
 
 //    const cv::Vec3d xyz_cv(xyz[0], xyz[1], xyz[2]);

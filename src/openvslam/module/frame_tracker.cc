@@ -11,6 +11,7 @@
 #include "openvslam/camera/perspective.h"
 #include "openvslam/camera/fisheye.h"
 #include "openvslam/camera/equirectangular.h"
+#include "openvslam/camera/radial_division.h"
 #include <spdlog/spdlog.h>
 #include <memory>
 
@@ -35,6 +36,11 @@ void get_undist_pt_and_bearing(const data::frame& curr_frame,
     }break;
     case camera::model_type_t::Equirectangular: {
         auto c = static_cast<camera::equirectangular*>(curr_frame.camera_);
+        undistorted_kp = c->undistort_keypoint(kp_curr);
+        bearing = c->convert_keypoint_to_bearing(undistorted_kp);
+    }break;
+    case camera::model_type_t::RadialDivision: {
+        auto c = static_cast<camera::radial_division*>(curr_frame.camera_);
         undistorted_kp = c->undistort_keypoint(kp_curr);
         bearing = c->convert_keypoint_to_bearing(undistorted_kp);
     }break;
@@ -187,10 +193,10 @@ bool frame_tracker::sparse_img_alignment_track(
 
     Mat44_t TCR;
 
-    sparse_image_align_->set_parameters(last_frm.image_pyramid_.size()-1, 1, 10, true, true);
+    sparse_image_align_->set_parameters(last_frm.image_pyramid_.size()-1, 1, 10, false, false);
     size_t ret = sparse_image_align_->run(&last_frm, &curr_frm, TCR);
 
-    if (ret == false) {
+    if (ret < 60) {
         spdlog::info("Sparse feature alignment failed. Falling back to feature methods");
         curr_frm.set_cam_pose(velocity * last_frm.cam_pose_cw_);
         return false;
@@ -229,7 +235,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
         std::vector<data::landmark*> local_landmarks,
         std::set<data::landmark*>& direct_map_points_cache) const {
 
-    optimize::pose_optimizer sparse_feat_pose_optimizer_(1, 10);
+    optimize::pose_optimizer sparse_feat_pose_optimizer_(2, 10);
 
 
     int cntSuccess = 0;
@@ -269,7 +275,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
             match::sparse_feature_aligner sparse_feat_aligner;
             // try align it with current frame
             const std::map<data::keyframe*, unsigned int> obs = mp->get_observations();
-            auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 2);
+            auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 5);
             eigen_alloc_vector<Vec2_t> matched_pixels;
             for (auto o: obs_sorted) {
                 int level = mp->scale_level_in_tracking_;
@@ -281,7 +287,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
                         || px_curr[1] >= curr_frame.image_pyramid_[0].rows - 20)
                         continue;
                     matched_pixels.push_back(px_curr);
-                    //break;
+                    break;
                 }
             }
             if (!matched_pixels.empty()) {
@@ -321,9 +327,9 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
         // we matched enough points in cache, then do pose optimization
         curr_frame.num_keypts_ = curr_frame.keypts_.size();
         curr_frame.stereo_x_right_.resize(curr_frame.num_keypts_,-1.0f);
-        unsigned int nr_valid_pose_optim = sparse_feat_pose_optimizer_.optimize(curr_frame);
+        sparse_feat_pose_optimizer_.optimize(curr_frame);
         unsigned int num_valid_pts = discard_outliers_sparse(curr_frame, direct_map_points_cache);
-        if (num_valid_pts < 30) {
+        if (num_valid_pts < 80) {
             spdlog::warn("re Track Local Map direct failed");
             return num_valid_pts;
         } else {
@@ -365,7 +371,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
                     || px_curr[1] >= curr_frame.image_pyramid_[0].rows - 20)
                     continue;
                 matched_pixels.push_back(px_curr);
-                //break;
+                break;
             }
         }
         if (!matched_pixels.empty()) {
@@ -397,7 +403,7 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
     curr_frame.keypts_right_.resize(curr_frame.num_keypts_);
     sparse_feat_pose_optimizer_.optimize(curr_frame);
     unsigned int num_valid_pts = discard_outliers_sparse(curr_frame, direct_map_points_cache);
-    if (num_valid_pts < 30) {
+    if (num_valid_pts < 100) {
         spdlog::warn("Track Local Map direct failed");
         return num_valid_pts;
     } else {
@@ -428,6 +434,7 @@ unsigned int frame_tracker::discard_outliers_sparse(
             //    direct_map_points_cache.erase(iter);
         }
         else {
+            //curr_frm.outlier_flags_.at(idx) = false;
             curr_frm.landmarks_[idx]->increase_num_observed();
              ++num_valid_matches;
         }

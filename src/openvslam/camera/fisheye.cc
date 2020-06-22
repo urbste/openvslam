@@ -382,7 +382,7 @@ void fisheye::jacobian_xyz_to_cam(const Vec3_t &xyz, Mat26_t &jac, const double 
     const double t86 = t82+t83+t84+t85;
     const double fx_scaled = scale * fx_;
     const double fy_scaled = scale * fy_;
-
+    jac.setZero();
     jac(0,0) = fx_scaled*t17*t20*t29*t35+fx_scaled*t2*t17*t20*t29*t61+fx_scaled*t2*t20*t23*t27*t35*t36-fx_scaled*t2*t17*t27*t35*t36*t42*(1.0/2.0);
     jac(0,1) = fx_scaled*t2*t17*t20*t29*t66+fx_scaled*t2*t20*t23*t35*t36*t40-fx_scaled*t2*t17*t35*t36*t40*t42*(1.0/2.0);
     jac(0,2) = -fx_scaled*t2*t6*t17*t20*t35-fx_scaled*t2*t17*t20*t29*t71-fx_scaled*t2*t20*t23*t29*t35*t45+fx_scaled*t2*t17*t29*t35*t42*t45*(1.0/2.0);

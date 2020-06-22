@@ -156,7 +156,7 @@ void equirectangular::jacobian_xyz_to_cam(const Vec3_t &xyz, Mat26_t &jac, const
 
     const double scaled_cols = cols_ * scale;
     const double scaled_rows = rows_ * scale;
-
+    jac.setZero();
     jac(0,0) = scaled_cols*t15*t18*t19*t25*(1.0/2.0);
     jac(0,1) = 0.0;
     jac(0,2) = scaled_cols*t7*t18*t19*t25*(-1.0/2.0);
@@ -169,7 +169,7 @@ void equirectangular::jacobian_xyz_to_cam(const Vec3_t &xyz, Mat26_t &jac, const
     jac(1,3) = scaled_rows*t19*t28*(Z*t31+t11*t29*(Y*t4*t32*2.0-Z*t3*t33*2.0)*(1.0/2.0));
     jac(1,4) = scaled_rows*t11*t19*t28*t29*(X*t4*t32*2.0-Z*t2*t34*2.0)*(-1.0/2.0);
     jac(1,5) = -scaled_rows*t19*t28*(X*t31-t11*t29*(X*t3*t33*2.0-Y*t2*t34*2.0)*(1.0/2.0));
-
+    jac *= -1.0;
 }
 } // namespace camera
 } // namespace openvslam
