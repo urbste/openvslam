@@ -258,6 +258,9 @@ protected:
     //! use sparse image alignment flag
     bool use_sparse_image_alignment_ = false;
 
+    //! use feature maps in image aligner
+    bool use_learned_feature_maps_ = false;
+
     std::set<data::landmark*> direct_map_points_cache_;
 
     bool extract_features_ = true;

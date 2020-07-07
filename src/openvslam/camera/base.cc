@@ -10,11 +10,14 @@ namespace camera {
 base::base(const std::string& name, const setup_type_t setup_type, const model_type_t model_type, const color_order_t color_order,
            const unsigned int cols, const unsigned int rows, const double fps,
            const double focal_x_baseline, const double true_baseline,
-           const unsigned int num_grid_cols, const unsigned int num_grid_rows)
+           const unsigned int num_grid_cols, const unsigned int num_grid_rows,
+           const double resize_fac)
     : name_(name), setup_type_(setup_type), model_type_(model_type), color_order_(color_order),
-      cols_(cols), rows_(rows), fps_(fps),
+      cols_(cols * resize_fac), rows_(rows * resize_fac), fps_(fps),
       focal_x_baseline_(focal_x_baseline), true_baseline_(true_baseline),
-      num_grid_cols_(num_grid_cols), num_grid_rows_(num_grid_rows) {
+      num_grid_cols_(num_grid_cols), num_grid_rows_(num_grid_rows),
+      resize_fac_(resize_fac)
+{
     spdlog::debug("CONSTRUCT: camera::base");
 }
 
@@ -105,6 +108,7 @@ void base::show_common_parameters() const {
     std::cout << "- rows: " << rows_ << std::endl;
     std::cout << "- color: " << get_color_order_string() << std::endl;
     std::cout << "- model: " << get_model_type_string() << std::endl;
+    std::cout << "- resize factor: " << resize_fac_ << std::endl;
 }
 
 } // namespace camera

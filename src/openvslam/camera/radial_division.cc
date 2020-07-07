@@ -13,10 +13,12 @@ namespace camera {
 radial_division::radial_division(const std::string& name, const setup_type_t& setup_type, const color_order_t& color_order,
                                  const unsigned int cols, const unsigned int rows, const double fps,
                                  const double fx, const double fy, const double cx, const double cy,
-                                 const double distortion, const double focal_x_baseline)
-    : base(name, setup_type, model_type_t::RadialDivision, color_order, cols, rows, fps, focal_x_baseline, focal_x_baseline / fx),
-      fx_(fx), fy_(fy), cx_(cx), cy_(cy), fx_inv_(1.0 / fx), fy_inv_(1.0 / fy),
-      distortion_(distortion) {
+                                 const double distortion, const double focal_x_baseline, const double resize_fac)
+    : base(name, setup_type, model_type_t::RadialDivision, color_order, cols, rows, fps,
+           focal_x_baseline, focal_x_baseline / fx, 64*resize_fac, 48*resize_fac, resize_fac),
+      fx_(fx * resize_fac), fy_(fy * resize_fac), cx_(cx * resize_fac), cy_(cy * resize_fac),
+      fx_inv_(1.0 / (fx * resize_fac)), fy_inv_(1.0 / (fy * resize_fac)),
+      distortion_(distortion), resize_fac_(resize_fac) {
     spdlog::debug("CONSTRUCT: camera::radial_division");
 
     cv_cam_matrix_ = (cv::Mat_<float>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
@@ -41,7 +43,8 @@ radial_division::radial_division(const YAML::Node& yaml_node)
                       yaml_node["Camera.cx"].as<double>(),
                       yaml_node["Camera.cy"].as<double>(),
                       yaml_node["Camera.distortion"].as<double>(),
-                      yaml_node["Camera.focal_x_baseline"].as<double>(0.0)) {}
+                      yaml_node["Camera.focal_x_baseline"].as<double>(0.0),
+                      yaml_node["Camera.resize_fac"].as<double>(0.0)) {}
 
 radial_division::~radial_division() {
     spdlog::debug("DESTRUCT: camera::radial_division");

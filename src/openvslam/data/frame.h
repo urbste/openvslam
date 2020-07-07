@@ -9,6 +9,8 @@
 #include <vector>
 #include <atomic>
 
+#include <torch/torch.h>
+
 #include <opencv2/core.hpp>
 #include <Eigen/Core>
 
@@ -265,7 +267,10 @@ public:
 
     void reset_features();
 
+    void create_learned_pyramid(torch::jit::script::Module &extractor_module);
+
     void create_image_pyramid();
+
 private:
     //! enumeration to control the behavior of extract_orb()
     enum class image_side { Left,
@@ -294,7 +299,6 @@ private:
     Mat33_t rot_wc_;
     //! translation: camera -> world
     Vec3_t cam_center_;
-
 };
 
 } // namespace data

@@ -16,9 +16,14 @@
 
 #include <spdlog/spdlog.h>
 
+#include <torch/script.h>
+
+#include <opencv2/imgproc.hpp>
+
 namespace openvslam {
 
-system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file_path)
+system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file_path,
+               const std::string& path_to_torch_module)
     : cfg_(cfg), camera_(cfg->camera_) {
     spdlog::debug("CONSTRUCT: system");
 
@@ -63,6 +68,12 @@ system::system(const std::shared_ptr<config>& cfg, const std::string& vocab_file
         exit(EXIT_FAILURE);
     }
 #endif
+
+    if (path_to_torch_module != "") {
+        spdlog::info("Loading learned feature pyramid model file: {}", path_to_torch_module);
+        learned_img_pyr_module_ = torch::jit::load(path_to_torch_module);
+        learned_img_pyr_module_.to(at::kCUDA);
+    }
 
     // database
     cam_db_ = new data::camera_database(camera_);
@@ -237,7 +248,17 @@ Mat44_t system::feed_monocular_frame(const cv::Mat& img, const double timestamp,
 
     check_reset_request();
 
-    const Mat44_t cam_pose_cw = tracker_->track_monocular_image(img, timestamp, mask);
+    cv::Mat resized_image, resized_mask;
+    if (camera_->resize_fac_ != 1.0) {
+        cv::resize(img, resized_image, cv::Size(), camera_->resize_fac_, camera_->resize_fac_);
+        if (!mask.empty())
+            cv::resize(mask, resized_mask, cv::Size(), camera_->resize_fac_, camera_->resize_fac_);
+    } else {
+        resized_image = img;
+        resized_mask = mask;
+    }
+
+    const Mat44_t cam_pose_cw = tracker_->track_monocular_image(resized_image, timestamp, resized_mask);
 
     frame_publisher_->update(tracker_);
     if (tracker_->tracking_state_ == tracker_state_t::Tracking) {

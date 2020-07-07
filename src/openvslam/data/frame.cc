@@ -10,12 +10,16 @@
 #include "openvslam/match/stereo.h"
 #include "openvslam/match/sparse_feature_aligner.h"
 
+#include <torch/torch.h>
+
 #include <thread>
 
 #include <spdlog/spdlog.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+
+using time_now = std::chrono::steady_clock;
 
 namespace openvslam {
 namespace data {
@@ -414,6 +418,60 @@ void frame::reset_features() {
     stereo_x_right_.clear();
     features_extracted_ = false;
 }
+
+torch::Tensor mat_to_tensor(const cv::Mat &image)
+{
+    bool isChar = (image.type() & 0xF) < 2;
+    std::vector<int64_t> dims = {1,image.rows, image.cols, image.channels()};
+    auto tensor = torch::from_blob(image.data, dims, isChar ? torch::kChar : torch::kFloat).to(torch::kFloat);
+    return tensor.permute({0,3,1,2});
+}
+
+void tensor_to_mat(const torch::Tensor &tensor,
+                   cv::Mat& result)
+{
+    auto sizes = tensor.sizes();
+    result.create(cv::Size(sizes[1], sizes[0]), CV_32FC1);//, tensor.data());
+    std::memcpy((void *)result.data, tensor.data_ptr(), sizeof(float) * tensor.numel());
+}
+
+void frame::create_learned_pyramid(torch::jit::script::Module &extractor_module) {
+    image_pyramid_.resize(extractor_->get_num_scale_levels());
+    auto t1 = time_now::now();
+
+    // Create a vector of inputs.
+    std::vector<torch::jit::IValue> inputs;
+    cv::Mat img_preprocessed;
+    img_gray_.convertTo(img_preprocessed,CV_32FC1);
+    img_preprocessed /= 255.f;
+    inputs.push_back(mat_to_tensor(img_preprocessed).to(at::kCUDA));
+
+    // Execute the model and turn its output into a tensor.
+    auto results = extractor_module.forward(inputs).toTuple();
+
+    for (unsigned int i=0; i < results->elements().size(); ++i) {
+        at::Tensor feature_map = results->elements()[i].toTensor().squeeze().to(torch::kFloat32);
+        // now add feature map over channel dimension
+        at::Tensor feature_image = feature_map.sum(0, true) / feature_map.sizes()[0];
+        at::Tensor feature_image_cpu = feature_image.detach().permute({1,2,0}).to(torch::kCPU);
+
+        tensor_to_mat(feature_image_cpu, image_pyramid_.at(i));
+    }
+    auto t2 = time_now::now();
+    std::cout << "time for learned feature map extraction : "
+        << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+        << " ms\n";
+//    image_pyramid_.at(0) = img_gray_.clone();
+//    for (unsigned int level = 1;
+//         level < extractor_->get_num_scale_levels(); ++level) {
+//        // determine the size of an image
+//        const double scale = scale_factors_.at(level);
+//        const cv::Size size(std::round(img_gray_.cols * 1.0 / scale), std::round(img_gray_.rows * 1.0 / scale));
+//        // resize
+//        cv::resize(image_pyramid_.at(level - 1), image_pyramid_.at(level), size, 0, 0, cv::INTER_LINEAR);
+//    }
+}
+
 
 void frame::create_image_pyramid() {
     image_pyramid_.resize(extractor_->get_num_scale_levels());

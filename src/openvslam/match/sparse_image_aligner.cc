@@ -90,11 +90,10 @@ Mat66_t sparse_image_aligner::getFisherInformation() {
     return I;
 }
 
+
 void sparse_image_aligner::precomputeReferencePatches() {
     const int border = IMAGE_ALIGN_PATCH_HALF_SIZE + 1;
     const cv::Mat& ref_img = ref_frame_->image_pyramid_[level_];
-
-    const int stride = ref_img.cols;
     const double scale = ref_frame_->inv_scale_factors_[level_];
     size_t feature_counter = 0;
 
@@ -143,39 +142,29 @@ void sparse_image_aligner::precomputeReferencePatches() {
         }break;
         }
         // compute bilateral interpolation weights for reference image
-        const float subpix_u_ref = u_ref - u_ref_i;
-        const float subpix_v_ref = v_ref - v_ref_i;
-        const float w_ref_tl = (1.0 - subpix_u_ref) * (1.0 - subpix_v_ref);
-        const float w_ref_tr = subpix_u_ref * (1.0 - subpix_v_ref);
-        const float w_ref_bl = (1.0 - subpix_u_ref) * subpix_v_ref;
-        const float w_ref_br = subpix_u_ref * subpix_v_ref;
+        Eigen::Vector4f interp_weights;
+        get_interp_weights(u_ref, v_ref, interp_weights);
+
         size_t pixel_counter = 0;
         float *cache_ptr = reinterpret_cast<float *> ( ref_patch_cache_.data ) +
                 IMAGE_ALIGN_PATCH_AREA * feature_counter;
-        for (int y = 0; y < IMAGE_ALIGN_PATCH_SIZE; ++y) {
-            uint8_t *ref_img_ptr = (uint8_t *) ref_img.data +
-                    (v_ref_i + y - IMAGE_ALIGN_PATCH_HALF_SIZE) * stride +
-                    (u_ref_i - IMAGE_ALIGN_PATCH_HALF_SIZE);
 
-            for (int x = 0; x < IMAGE_ALIGN_PATCH_SIZE;
-                 ++x, ++ref_img_ptr, ++cache_ptr, ++pixel_counter) {
-                // precompute interpolated reference patch color
-                *cache_ptr =
-                        w_ref_tl * ref_img_ptr[0] +
-                        w_ref_tr * ref_img_ptr[1] +
-                        w_ref_bl * ref_img_ptr[stride] +
-                        w_ref_br * ref_img_ptr[stride + 1];
+        int x_start = u_ref_i - IMAGE_ALIGN_PATCH_HALF_SIZE;
+        int y_start = v_ref_i - IMAGE_ALIGN_PATCH_HALF_SIZE;
+
+        for (int y = y_start; y < IMAGE_ALIGN_PATCH_SIZE+y_start; ++y) {
+            for (int x = x_start; x < IMAGE_ALIGN_PATCH_SIZE+x_start; ++x, ++pixel_counter,++cache_ptr) {
+                *cache_ptr = get_interpolation_weighted_grayvalue<float>(ref_img, x, y, interp_weights);
+
+                const float dx_plus_1 = get_interpolation_weighted_grayvalue<float>(ref_img, x+1, y, interp_weights);
+                const float dx_minus_1 = get_interpolation_weighted_grayvalue<float>(ref_img, x-1, y, interp_weights);
+                const float dy_plus_1 = get_interpolation_weighted_grayvalue<float>(ref_img, x, y+1, interp_weights);
+                const float dy_minus_1 = get_interpolation_weighted_grayvalue<float>(ref_img, x, y-1, interp_weights);
 
                 // we use the inverse compositional: thereby we can take the gradient always at the same position
                 // get gradient of warped image (~gradient at warped position)
-                const double dx = 0.5 * ((w_ref_tl * ref_img_ptr[1] + w_ref_tr * ref_img_ptr[2] +
-                                    w_ref_bl * ref_img_ptr[stride + 1] + w_ref_br * ref_img_ptr[stride + 2])
-                                   - (w_ref_tl * ref_img_ptr[-1] + w_ref_tr * ref_img_ptr[0] +
-                                      w_ref_bl * ref_img_ptr[stride - 1] + w_ref_br * ref_img_ptr[stride]));
-                const double dy = 0.5 * ((w_ref_tl * ref_img_ptr[stride] + w_ref_tr * ref_img_ptr[1 + stride] +
-                                    w_ref_bl * ref_img_ptr[stride * 2] + w_ref_br * ref_img_ptr[stride * 2 + 1])
-                                   - (w_ref_tl * ref_img_ptr[-stride] + w_ref_tr * ref_img_ptr[1 - stride] +
-                                      w_ref_bl * ref_img_ptr[0] + w_ref_br * ref_img_ptr[1]));
+                const double dx = 0.5 * (dx_plus_1 - dx_minus_1);
+                const double dy = 0.5 * (dy_plus_1 - dy_minus_1);
 
                 // cache the jacobian
                 jacobian_cache_.col(feature_counter * IMAGE_ALIGN_PATCH_AREA + pixel_counter) =
@@ -183,7 +172,6 @@ void sparse_image_aligner::precomputeReferencePatches() {
             }
         }
     }
-    //std::cout<<"feature_counter: "<<feature_counter<<"\n";
 
     have_ref_patch_cache_ = true;
 }
@@ -215,7 +203,6 @@ double sparse_image_aligner::computeResiduals(
     std::vector<double> errors;
     if (compute_weight_scale)
         errors.reserve(visible_fts_.size());
-    const int stride = cur_img.cols;
     const int border = IMAGE_ALIGN_PATCH_HALF_SIZE + 1;
     const double scale = ref_frame_->inv_scale_factors_[level_];
     double chi2 = 0.0;
@@ -253,30 +240,22 @@ double sparse_image_aligner::computeResiduals(
         visible++;
 
         // compute bilateral interpolation weights for the current image
-        const float subpix_u_cur = u_cur - u_cur_i;
-        const float subpix_v_cur = v_cur - v_cur_i;
-        const float w_cur_tl = (1.0f - subpix_u_cur) * (1.0f - subpix_v_cur);
-        const float w_cur_tr = subpix_u_cur * (1.0f - subpix_v_cur);
-        const float w_cur_bl = (1.0f - subpix_u_cur) * subpix_v_cur;
-        const float w_cur_br = subpix_u_cur * subpix_v_cur;
+        Eigen::Vector4f interp_weights;
+        get_interp_weights(u_cur, v_cur, interp_weights);
+
         float *ref_patch_cache_ptr =
                 reinterpret_cast<float *> ( ref_patch_cache_.data ) + IMAGE_ALIGN_PATCH_AREA * feature_counter;
         size_t pixel_counter = 0; // is used to compute the index of the cached jacobian
-        for (int y = 0; y < IMAGE_ALIGN_PATCH_SIZE; ++y) {
-            uint8_t *cur_img_ptr = (uint8_t *) cur_img.data +
-                    (v_cur_i + y - IMAGE_ALIGN_PATCH_HALF_SIZE) * stride +
-                    (u_cur_i - IMAGE_ALIGN_PATCH_HALF_SIZE);
 
-            for (int x = 0; x < IMAGE_ALIGN_PATCH_SIZE;
-                 ++x, ++pixel_counter, ++cur_img_ptr, ++ref_patch_cache_ptr) {
-                // compute residual
-                const float intensity_cur =
-                        w_cur_tl * cur_img_ptr[0] +
-                        w_cur_tr * cur_img_ptr[1] +
-                        w_cur_bl * cur_img_ptr[stride] +
-                        w_cur_br * cur_img_ptr[stride + 1];
-                const double res = static_cast<double>(intensity_cur - (*ref_patch_cache_ptr));
-                //std::cout<<"res "<<res<<"\n";
+        int x_start = u_cur_i - IMAGE_ALIGN_PATCH_HALF_SIZE;
+        int y_start = v_cur_i - IMAGE_ALIGN_PATCH_HALF_SIZE;
+
+        for (int y = y_start; y < IMAGE_ALIGN_PATCH_SIZE+y_start; ++y) {
+            for (int x = x_start; x < IMAGE_ALIGN_PATCH_SIZE+x_start; ++x, ++pixel_counter,++ref_patch_cache_ptr) {
+
+                const double res = static_cast<double>(
+                            get_interpolation_weighted_grayvalue<float>(cur_img, x, y, interp_weights) -
+                            (*ref_patch_cache_ptr));
                 // used to compute scale for robust cost
                 if (compute_weight_scale)
                     errors.push_back(std::abs(res));
@@ -284,7 +263,7 @@ double sparse_image_aligner::computeResiduals(
                 // robustification
                 double weight = 1.0;
                 if (use_weights_) {
-                    weight = huber_loss(res, 5);
+                    weight = huber_loss(res/res_scale_, 1.345);
                 }
 
                 chi2 += res * res * weight;
@@ -306,13 +285,39 @@ double sparse_image_aligner::computeResiduals(
 
 
     // compute the weights on the first iteration
-    //if (compute_weight_scale && iter_ == 0)
-    //    scale_ = scale_estimator_->compute(errors);
-    // std::cout<<"feature_counter: "<<feature_counter<<"\n";
+    if (compute_weight_scale && iter_ == 0)
+        res_scale_ = scale_estimator(errors);
     // std::cout<<"visible: "<<visible<<std::endl;
     // std::cout<<"n_meas_: "<<n_meas_<<std::endl;
 
     return chi2 / n_meas_;
+}
+
+double sparse_image_aligner::scale_estimator(const std::vector<double> &errors) {
+    double initial_lamda = 1.0 / (5.0 * 5.0);
+    int num = 0;
+    double lambda = initial_lamda;
+    int iterations = 0;
+    do
+    {
+      ++iterations;
+      initial_lamda = lambda;
+      num = 0;
+      lambda = 0.0f;
+
+      for(std::vector<double>::const_iterator it=errors.begin(); it!=errors.end(); ++it)
+      {
+        if(std::isfinite(*it))
+        {
+          ++num;
+          const double error2 = (*it)*(*it);
+          lambda += error2 * ( (5.0 + 1.0) / (5.0 + initial_lamda * error2) );
+        }
+      }
+      lambda = double(num) / lambda;
+    } while(std::abs(lambda - initial_lamda) > 1e-3);
+
+    return std::sqrt(1.0 / lambda);
 }
 
 int sparse_image_aligner::solve() {
@@ -347,9 +352,10 @@ void sparse_image_aligner::optimize(::g2o::SE3Quat& model) {
 void sparse_image_aligner::optimizeGaussNewton(g2o::SE3Quat& model) {
     // Compute weight scale
     error_increased_ = false;
-    //if (use_weights_) {
-    //    computeResiduals(model, false, true);
-    //}
+    // to get the residual scaling factor
+    if (use_weights_) {
+        computeResiduals(model, false, true);
+    }
 
     // Save the old model to rollback in case of unsuccessful update
     g2o::SE3Quat old_model(model);

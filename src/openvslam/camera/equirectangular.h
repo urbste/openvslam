@@ -9,7 +9,8 @@ namespace camera {
 class equirectangular final : public base {
 public:
     equirectangular(const std::string& name, const color_order_t& color_order,
-                    const unsigned int cols, const unsigned int rows, const double fps);
+                    const unsigned int cols, const unsigned int rows, const double fps,
+                    const double resize_fac = 1.0);
 
     equirectangular(const YAML::Node& yaml_node);
 
@@ -68,6 +69,8 @@ public:
     void jacobian_xyz_to_cam(const Vec3_t& xyz, Mat26_t& jac, const double scale) const override final;
 
     nlohmann::json to_json() const override final;
+
+    const double resize_fac_;
 };
 
 } // namespace camera

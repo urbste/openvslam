@@ -14,10 +14,12 @@ perspective::perspective(const std::string& name, const setup_type_t& setup_type
                          const unsigned int cols, const unsigned int rows, const double fps,
                          const double fx, const double fy, const double cx, const double cy,
                          const double k1, const double k2, const double p1, const double p2, const double k3,
-                         const double focal_x_baseline)
-    : base(name, setup_type, model_type_t::Perspective, color_order, cols, rows, fps, focal_x_baseline, focal_x_baseline / fx),
-      fx_(fx), fy_(fy), cx_(cx), cy_(cy), fx_inv_(1.0 / fx), fy_inv_(1.0 / fy),
-      k1_(k1), k2_(k2), p1_(p1), p2_(p2), k3_(k3) {
+                         const double focal_x_baseline, const double resize_fac)
+    : base(name, setup_type, model_type_t::Perspective, color_order, cols, rows, fps, focal_x_baseline, focal_x_baseline / fx,
+           64*resize_fac, 48*resize_fac, resize_fac),
+      fx_(fx * resize_fac), fy_(fy * resize_fac), cx_(cx * resize_fac), cy_(cy * resize_fac),
+      fx_inv_(1.0 / (fx * resize_fac)), fy_inv_(1.0 / (fy * resize_fac)),
+      k1_(k1), k2_(k2), p1_(p1), p2_(p2), k3_(k3), resize_fac_(resize_fac) {
     spdlog::debug("CONSTRUCT: camera::perspective");
 
     cv_cam_matrix_ = (cv::Mat_<double>(3, 3) << fx_, 0, cx_, 0, fy_, cy_, 0, 0, 1);
@@ -48,7 +50,8 @@ perspective::perspective(const YAML::Node& yaml_node)
                   yaml_node["Camera.p1"].as<double>(),
                   yaml_node["Camera.p2"].as<double>(),
                   yaml_node["Camera.k3"].as<double>(),
-                  yaml_node["Camera.focal_x_baseline"].as<double>(0.0)) {}
+                  yaml_node["Camera.focal_x_baseline"].as<double>(0.0),
+                  yaml_node["Camera.resize_fac"].as<double>(0.0)) {}
 
 perspective::~perspective() {
     spdlog::debug("DESTRUCT: camera::perspective");

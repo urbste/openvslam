@@ -19,6 +19,40 @@ const int IMAGE_ALIGN_PATCH_HALF_SIZE = 2;
 const int IMAGE_ALIGN_PATCH_SIZE = 2 * IMAGE_ALIGN_PATCH_HALF_SIZE;
 const int IMAGE_ALIGN_PATCH_AREA = IMAGE_ALIGN_PATCH_SIZE * IMAGE_ALIGN_PATCH_SIZE;
 
+inline void get_interp_weights(
+        const float x, const float y,
+        Eigen::Vector4f& interp_weights) {
+    const float subpix_x = x - std::floor(x);
+    const float subpix_y = y - std::floor(y);
+    interp_weights << (1.0 - subpix_x) * (1.0 - subpix_y),
+            subpix_x * (1.0 - subpix_y),
+            (1.0 - subpix_x) * subpix_y,
+            subpix_x * subpix_y;
+}
+
+
+template <typename T>
+T get_interpolation_weighted_grayvalue(
+    const cv::Mat& img,
+    const int& x,
+    const int& y,
+    const Eigen::Vector4f& weights) {
+    // central pixel value
+    Eigen::Vector4f image_values;
+    if (img.type() == CV_32FC1) {
+        image_values << static_cast<float>(img.ptr<float>(y)[x]),
+                        static_cast<float>(img.ptr<float>(y)[x+1]),
+                        static_cast<float>(img.ptr<float>(y+1)[x]),
+                        static_cast<float>(img.ptr<float>(y+1)[x+1]);
+    } else if (img.type() == CV_8UC1) {
+        image_values << static_cast<float>(img.ptr<uint8_t>(y)[x]),
+                        static_cast<float>(img.ptr<uint8_t>(y)[x+1]),
+                        static_cast<float>(img.ptr<uint8_t>(y+1)[x]),
+                        static_cast<float>(img.ptr<uint8_t>(y+1)[x+1]);
+    }
+    return (T)image_values.dot(weights);
+}
+
 class sparse_image_aligner final : public base {
 public:
 EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -115,7 +149,10 @@ protected:
         return J;
     }
 
+
 private:
+    double scale_estimator(const std::vector<double>& errors);
+
     int level_;                     //!< current pyramid level on which the optimization runs.
     bool display_;                  //!< display residual image.
     //!< coarsest pyramid level for the alignment.
@@ -152,6 +189,8 @@ private:
     double mu_init_ = 0.1;
 
     double nu_init_ = 2.0;
+
+    double res_scale_ = 1.0;
 };
 
 } // namespace match

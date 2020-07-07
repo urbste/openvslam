@@ -12,6 +12,7 @@
 #include "openvslam/util/image_converter.h"
 
 #include <opencv2/highgui.hpp>
+#include <torch/script.h>
 
 #include <chrono>
 #include <iostream>
@@ -28,8 +29,9 @@ tracking_module::tracking_module(const std::shared_ptr<config>& cfg, system* sys
     : cfg_(cfg), camera_(cfg->camera_), system_(system), map_db_(map_db), bow_vocab_(bow_vocab), bow_db_(bow_db),
       initializer_(cfg->camera_->setup_type_, map_db, bow_db, cfg->yaml_node_),
       frame_tracker_(camera_, 10), relocalizer_(bow_db_), pose_optimizer_(),
-      keyfrm_inserter_(cfg_->camera_->setup_type_, cfg_->true_depth_thr_, map_db, bow_db, 0, cfg_->camera_->fps_),
-      use_sparse_image_alignment_(cfg_->use_sparse_image_alignment_){
+      keyfrm_inserter_(cfg_->camera_->setup_type_, cfg_->true_depth_thr_, map_db, bow_db, 3, cfg_->camera_->fps_),
+      use_sparse_image_alignment_(cfg_->use_sparse_image_alignment_),
+      use_learned_feature_maps_(cfg_->use_learned_feature_maps_){
     spdlog::debug("CONSTRUCT: tracking_module");
 
     extractor_left_ = new feature::orb_extractor(cfg_->orb_params_);
@@ -40,6 +42,7 @@ tracking_module::tracking_module(const std::shared_ptr<config>& cfg, system* sys
     if (camera_->setup_type_ == camera::setup_type_t::Stereo) {
         extractor_right_ = new feature::orb_extractor(cfg_->orb_params_);
     }
+
 }
 
 tracking_module::~tracking_module() {
@@ -102,7 +105,11 @@ Mat44_t tracking_module::track_monocular_image(const cv::Mat& img, const double 
         curr_frm_.run_feature_extraction(true);
     }
     if (use_sparse_image_alignment_) {
-        curr_frm_.create_image_pyramid();
+        if (use_learned_feature_maps_) {
+           curr_frm_.create_learned_pyramid(system_->learned_img_pyr_module_);
+        } else {
+            curr_frm_.create_image_pyramid();
+        }
     }
     track();
 
@@ -226,7 +233,7 @@ void tracking_module::track() {
         // set the reference keyframe of the current frame
         curr_frm_.ref_keyfrm_ = ref_keyfrm_;
 
-        auto succeeded = track_current_frame(false, true);
+        auto succeeded = track_current_frame(false, use_sparse_image_alignment_);
 
         // update the local map and optimize the camera pose of the current frame
         if (succeeded)

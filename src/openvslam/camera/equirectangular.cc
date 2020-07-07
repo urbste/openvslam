@@ -7,8 +7,10 @@ namespace openvslam {
 namespace camera {
 
 equirectangular::equirectangular(const std::string& name, const color_order_t& color_order,
-                                 const unsigned int cols, const unsigned int rows, const double fps)
-    : base(name, setup_type_t::Monocular, model_type_t::Equirectangular, color_order, cols, rows, fps, 0.0, 0.0) {
+                                 const unsigned int cols, const unsigned int rows, const double fps,
+                                 const double resize_fac)
+    : base(name, setup_type_t::Monocular, model_type_t::Equirectangular, color_order, cols, rows, fps, 0.0, 0.0, resize_fac),
+     resize_fac_(resize_fac) {
     spdlog::debug("CONSTRUCT: camera::equirectangular");
 
     img_bounds_ = compute_image_bounds();
@@ -22,7 +24,9 @@ equirectangular::equirectangular(const YAML::Node& yaml_node)
                       load_color_order(yaml_node),
                       yaml_node["Camera.cols"].as<unsigned int>(),
                       yaml_node["Camera.rows"].as<unsigned int>(),
-                      yaml_node["Camera.fps"].as<double>()) {}
+                      yaml_node["Camera.fps"].as<double>(),
+                      yaml_node["Camera.resize_fac"].as<double>()) {
+}
 
 equirectangular::~equirectangular() {
     spdlog::debug("DESTRUCT: camera::equirectangular");

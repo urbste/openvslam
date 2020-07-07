@@ -11,6 +11,9 @@
 
 #include <opencv2/core/core.hpp>
 
+#include <torch/torch.h>
+#include <torch/script.h>
+
 namespace openvslam {
 
 class config;
@@ -36,7 +39,8 @@ class frame_publisher;
 class system {
 public:
     //! Constructor
-    system(const std::shared_ptr<config>& cfg, const std::string& vocab_file_path);
+    system(const std::shared_ptr<config>& cfg, const std::string& vocab_file_path,
+           const std::string& path_to_torch_module = "");
 
     //! Destructor
     ~system();
@@ -143,6 +147,9 @@ public:
     //!! Termination of the system is requested or not
     bool terminate_is_requested() const;
 
+    //! torch feature extractor module
+    torch::jit::script::Module learned_img_pyr_module_;
+
 private:
     //! Check reset request of the system
     void check_reset_request();
@@ -175,6 +182,7 @@ private:
 
     //! mapping module
     mapping_module* mapper_ = nullptr;
+
     //! mapping thread
     std::unique_ptr<std::thread> mapping_thread_ = nullptr;
 

@@ -42,8 +42,9 @@ bool keyframe_inserter::new_keyframe_is_needed(const data::frame& curr_frm, cons
     // 最新のキーフレームで観測している3次元点数に対する，現在のフレームで観測している3次元点数の割合の閾値
     constexpr unsigned int num_tracked_lms_thr = 15;
     float lms_ratio_thr = 0.9;
+
     if (curr_frm.image_pyramid_.size() > 0)
-        lms_ratio_thr = 0.9;
+        lms_ratio_thr = 0.7;
     // 条件A1: 前回のキーフレーム挿入からmax_num_frames_以上経過していたらキーフレームを追加する
     const bool cond_a1 = frm_id_of_last_keyfrm_ + max_num_frms_ <= curr_frm.id_;
     // 条件A2: min_num_frames_以上経過していて,mapping moduleが待機状態であればキーフレームを追加する
@@ -54,6 +55,23 @@ bool keyframe_inserter::new_keyframe_is_needed(const data::frame& curr_frm, cons
     // 条件B: (キーフレーム追加の必要条件)3次元点が閾値以上観測されていて，3次元点との割合が一定割合以下であればキーフレームを追加する
     const bool cond_b = (num_tracked_lms_thr <= num_tracked_lms) && (num_tracked_lms < num_reliable_lms * lms_ratio_thr);
 
+    std::cout<<"\n\n\nnum_reliable_lms: "<<num_reliable_lms<<" num_tracked_lms: "<<num_tracked_lms<<std::endl;
+    if (mapper_is_idle) {
+        std::cout<<"mapper is idle is true.\n";
+    }
+    if (cond_a1) {
+        std::cout<<"cond_a1 is true.\n";
+    }
+    if (cond_a2) {
+        std::cout<<"cond_a2 is true.\n";
+    }
+    if (cond_a3) {
+        std::cout<<"cond_a3 is true.\n";
+    }
+    if (cond_b) {
+        std::cout<<"cond_b is true.\n";
+    }
+    std::cout<<"\n\n\n";
     // Bが満たされていなければ追加しない
     if (!cond_b) {
         return false;
@@ -73,6 +91,7 @@ bool keyframe_inserter::new_keyframe_is_needed(const data::frame& curr_frm, cons
     if (setup_type_ != camera::setup_type_t::Monocular
         && mapper_->get_num_queued_keyframes() <= 2) {
         mapper_->abort_local_BA();
+        std::cout<<"ABORTING LOCALBA\n";
         return true;
     }
 

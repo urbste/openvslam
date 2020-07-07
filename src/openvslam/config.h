@@ -37,8 +37,14 @@ public:
     //! depthmap factor (pixel_value / depthmap_factor = true_depth)
     double depthmap_factor_ = 1.0;
 
-    //! user sparse image alinger
+    //! use sparse image aligner
     bool use_sparse_image_alignment_ = true;
+
+    //! use feature maps for image aligner
+    bool use_learned_feature_maps_ = false;
+
+    //! global image resize factor
+    double resize_fac_ = 1.0;
 };
 
 } // namespace openvslam

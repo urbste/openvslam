@@ -109,6 +109,8 @@ config::config(const YAML::Node& yaml_node, const std::string& config_file_path)
     }
 
     use_sparse_image_alignment_ = (bool)yaml_node_["use_sparse_image_alignment"].as<int>();
+    use_learned_feature_maps_ = (bool)yaml_node_["use_learned_feature_maps"].as<int>();
+    resize_fac_ = (bool)yaml_node_["Camera.resize_fac"].as<double>();
 }
 
 config::~config() {

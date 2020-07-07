@@ -196,10 +196,10 @@ bool frame_tracker::sparse_img_alignment_track(
 
     Mat44_t TCR;
 
-    sparse_image_align_->set_parameters(last_frm.image_pyramid_.size()-1, 1, 10, false, false);
+    sparse_image_align_->set_parameters(last_frm.image_pyramid_.size()-1, 1, 30, false, false);
     size_t ret = sparse_image_align_->run(&last_frm, &curr_frm, TCR);
 
-    if (ret < 60) {
+    if (ret < 30) {
         spdlog::info("Sparse feature alignment failed. Falling back to feature methods");
         curr_frm.set_cam_pose(velocity * last_frm.cam_pose_cw_);
         return false;
@@ -252,12 +252,12 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
         std::vector<data::landmark*> local_landmarks,
         std::set<data::landmark*>& direct_map_points_cache) const {
 
-    optimize::pose_optimizer sparse_feat_pose_optimizer_(1, 10);
+    optimize::pose_optimizer sparse_feat_pose_optimizer_(2, 10);
 
 
     int cntSuccess = 0;
     // use grid to evaluate the coverage of feature points
-    const int grid_size = 5;
+    const int grid_size = 10;
     const int grid_rows = curr_frame.image_pyramid_[0].rows / grid_size;
     const int grid_cols = curr_frame.image_pyramid_[0].cols / grid_size;
     std::vector<bool> grid(grid_rows * grid_cols, false);
@@ -289,16 +289,26 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
                 continue;        // already exist a projection
             }
 
-            match::sparse_feature_aligner sparse_feat_aligner;
+            match::sparse_feature_aligner<uint8_t> sparse_feat_aligner_uint;
+            match::sparse_feature_aligner<float> sparse_feat_aligner_float;
+
             // try align it with current frame
             const std::map<data::keyframe*, unsigned int> obs = mp->get_observations();
-            auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 5);
+            auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 2);
             eigen_alloc_vector<Vec2_t> matched_pixels;
             for (auto o: obs_sorted) {
                 int level = mp->scale_level_in_tracking_;
                 Vec2_t px_curr(track_xy[0],track_xy[1]);
-                if (sparse_feat_aligner.find_projection_direct(o.first, &curr_frame,
-                                                               mp, px_curr, level)) {
+                bool res = false;
+                if (curr_frame.image_pyramid_[0].type() == CV_8UC1) {
+                    res = sparse_feat_aligner_uint.find_projection_direct(o.first, &curr_frame,
+                                                                     mp, px_curr, level);
+                }
+                else if (curr_frame.image_pyramid_[0].type() == CV_32FC1) {
+                    res = sparse_feat_aligner_float.find_projection_direct(o.first, &curr_frame,
+                                                                     mp, px_curr, level);
+                }
+                if (res) {
                     if (px_curr[0] < 20 || px_curr[1] < 20
                         || px_curr[0] >= curr_frame.image_pyramid_[0].cols - 20
                         || px_curr[1] >= curr_frame.image_pyramid_[0].rows - 20)
@@ -385,16 +395,26 @@ unsigned int frame_tracker::sparse_feat_alignment_track(
 //            continue;        // already exist a projection in that grid
 //        }
 
-        match::sparse_feature_aligner sparse_feat_aligner;
+        match::sparse_feature_aligner<uint8_t> sparse_feat_aligner_uint;
+        match::sparse_feature_aligner<float> sparse_feat_aligner_float;
         // try align it with current frame
         const std::map<data::keyframe*, unsigned int> obs = mp->get_observations();
-        auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 5);
+        auto obs_sorted = SelectNearestKeyframe(obs, ref_keyframe, 2);
         eigen_alloc_vector<Vec2_t> matched_pixels;
         for (auto o: obs_sorted) {
             int level = mp->scale_level_in_tracking_;
             Vec2_t px_curr(track_xy[0],track_xy[1]);
-            if (sparse_feat_aligner.find_projection_direct(o.first, &curr_frame,
-                                                           mp, px_curr, level)) {
+            bool res = false;
+            if (curr_frame.image_pyramid_[0].type() == CV_8UC1) {
+                res = sparse_feat_aligner_uint.find_projection_direct(o.first, &curr_frame,
+                                                                 mp, px_curr, level);
+            }
+            else if (curr_frame.image_pyramid_[0].type() == CV_32FC1) {
+                res = sparse_feat_aligner_float.find_projection_direct(o.first, &curr_frame,
+                                                                 mp, px_curr, level);
+            }
+
+            if (res) {
                 if (px_curr[0] < 20 || px_curr[1] < 20
                     || px_curr[0] >= curr_frame.image_pyramid_[0].cols - 20
                     || px_curr[1] >= curr_frame.image_pyramid_[0].rows - 20)

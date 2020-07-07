@@ -560,6 +560,8 @@ void orb_extractor::compute_fast_keypoints(
 std::vector<cv::KeyPoint> orb_extractor::distribute_keypoints_via_tree(const std::vector<cv::KeyPoint>& keypts_to_distribute,
                                                                        const int min_x, const int max_x, const int min_y, const int max_y,
                                                                        const unsigned int num_keypts) const {
+    if (keypts_to_distribute.empty())
+        return std::vector<cv::KeyPoint>();
     auto nodes = initialize_nodes(keypts_to_distribute, min_x, max_x, min_y, max_y);
 
     // Forkable leaf nodes list
