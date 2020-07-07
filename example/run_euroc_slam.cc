@@ -34,12 +34,13 @@
 void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                    const std::string& vocab_file_path, const std::string& sequence_dir_path,
                    const unsigned int frame_skip, const bool no_sleep, const bool auto_term,
-                   const bool eval_log, const std::string& map_db_path, const bool equal_hist) {
+                   const bool eval_log, const std::string& map_db_path, const bool equal_hist,
+                   const std::string& learned_feature_model_path) {
     const euroc_sequence sequence(sequence_dir_path);
     const auto frames = sequence.get_frames();
 
     // build a SLAM system
-    openvslam::system SLAM(cfg, vocab_file_path);
+    openvslam::system SLAM(cfg, vocab_file_path, learned_feature_model_path);
     // startup the SLAM process
     SLAM.startup();
 
@@ -299,6 +300,7 @@ int main(int argc, char* argv[]) {
     auto eval_log = op.add<popl::Switch>("", "eval-log", "store trajectory and tracking times for evaluation");
     auto map_db_path = op.add<popl::Value<std::string>>("p", "map-db", "store a map database at this path after SLAM", "");
     auto equal_hist = op.add<popl::Switch>("", "equal-hist", "apply histogram equalization");
+    auto path_to_torch_model = op.add<popl::Value<std::string>>("", "torch-model", "path to torch model to extract learned feature pyramids for direct tracking", "");
 
     try {
         op.parse(argc, argv);
@@ -349,7 +351,8 @@ int main(int argc, char* argv[]) {
     if (cfg->camera_->setup_type_ == openvslam::camera::setup_type_t::Monocular) {
         mono_tracking(cfg, vocab_file_path->value(), data_dir_path->value(),
                       frame_skip->value(), no_sleep->is_set(), auto_term->is_set(),
-                      eval_log->is_set(), map_db_path->value(), equal_hist->is_set());
+                      eval_log->is_set(), map_db_path->value(), equal_hist->is_set(),
+                      path_to_torch_model->value());
     }
     else if (cfg->camera_->setup_type_ == openvslam::camera::setup_type_t::Stereo) {
         stereo_tracking(cfg, vocab_file_path->value(), data_dir_path->value(),

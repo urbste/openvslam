@@ -25,14 +25,16 @@ Camera.rows: 480
 
 Camera.color_order: "RGB"
 
+Camera.resize_fac: 0.75
+
 #================#
 # ORB Parameters #
 #================#
 
-Feature.max_num_keypoints: 800
+Feature.max_num_keypoints: 500
 Feature.scale_factor: 2.0
 Feature.num_levels: 4
-Feature.ini_fast_threshold: 20
+Feature.ini_fast_threshold: 30
 Feature.min_fast_threshold: 7
 
 #===========================#
@@ -54,4 +56,5 @@ PangolinViewer.viewpoint_f: 400
 # New features              #
 #===========================#
 
-#use_sparse_image_alignment: 1
+use_sparse_image_alignment: 1
+use_learned_feature_maps: 1    # requires torch and a cuda gpu
