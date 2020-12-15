@@ -308,8 +308,21 @@ void system::set_use_gps_data() {
     global_optimizer_->enable_gps();
 }
 
+void system::set_use_imu_data() {
+    use_imu_data_ = true;
+}
+
+void system::set_imu_config(const imu::config& imu_config) {
+    imu_config_ = imu_config;
+    tracker_->set_imu_config(imu_config);
+}
+
 bool system::is_gps_data_used() {
     return use_gps_data_;
+}
+
+bool system::is_imu_data_used() {
+    return use_imu_data_;
 }
 
 void system::pause_tracker() {

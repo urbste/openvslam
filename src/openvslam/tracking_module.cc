@@ -10,6 +10,7 @@
 #include "openvslam/feature/orb_extractor.h"
 #include "openvslam/match/projection.h"
 #include "openvslam/util/image_converter.h"
+#include "openvslam/imu/imu_utils.h"
 
 #include <chrono>
 #include <unordered_map>
@@ -664,6 +665,21 @@ bool tracking_module::check_and_execute_pause() {
     else {
         return false;
     }
+}
+
+void tracking_module::update_gyro_rotation() {
+    Mat33_t rotation = Mat33_t::Identity();
+//    old_gyro_index_ = imu::integrate_gyro_for_rotation(
+//                imu_data_queue_, last_frm_.timestamp_,
+//                curr_frm_.timestamp_, imu_config_.get_imu_to_cam_time_offset(),
+//                imu_config_.get_rel_pose_ci(), Vec3_t::Zero(), rotation,
+//                old_gyro_index_);
+    // set the rotation part of the velocity to the gyro integrated values
+    velocity_.block<3,3>(0,0) = rotation;
+}
+
+void tracking_module::set_imu_config(const imu::config& imu_config) {
+    imu_config_ = imu_config;
 }
 
 } // namespace openvslam

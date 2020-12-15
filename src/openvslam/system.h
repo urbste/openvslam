@@ -4,7 +4,9 @@
 #include "openvslam/type.h"
 #include "openvslam/data/bow_vocabulary.h"
 #include "openvslam/imu/data.h"
+#include "openvslam/imu/config.h"
 #include "openvslam/gps/data.h"
+
 
 #include <string>
 #include <thread>
@@ -174,8 +176,17 @@ public:
     //! enable the use of GPS data
     void set_use_gps_data();
 
+    //! enable the use of IMU data
+    void set_use_imu_data();
+
+    //! set imu config initialization
+    void set_imu_config(const imu::config& imu_config);
+
     //! query if gps data usage is enabled
     bool is_gps_data_used();
+
+    //! query if imu data usage is enabled
+    bool is_imu_data_used();
 
     //! is local BA running
     bool is_local_ba_running() const;
@@ -245,6 +256,12 @@ private:
 
     //! use gps data
     bool use_gps_data_ = false;
+
+    //! use gps data
+    bool use_imu_data_ = false;
+
+    //! imu config
+    imu::config imu_config_;
 };
 
 } // namespace openvslam

@@ -10,6 +10,10 @@
 gopro_input_telemetry::gopro_input_telemetry() {}
 gopro_input_telemetry::~gopro_input_telemetry() {}
 
+void gopro_input_telemetry::set_imu_config(const std::shared_ptr<openvslam::imu::config> &config) {
+    //imu_config_ = openvslam::imu::config(config);
+}
+
 bool gopro_input_telemetry::read_telemetry(const std::string& telemetry_json_file) {
     return openvslam::io::ReadGoProTelemetryJson(telemetry_json_file,
                                                  gps_config_,
@@ -57,6 +61,7 @@ void interpolate_gps_data_for_cam_time(const std::vector<openvslam::gps::data>& 
             for (int v = 0; v < 3; ++v) {
                 xyz[v] = lerp(gps_data[data_idx].xyz_[v],gps_data[data_idx_1].xyz_[v], diff_cam_gps_t1);
             }
+            interpolated_gps_data.Set_ENUReferenceLLH(gps_data[data_idx].llh_enu_reference_);
             interpolated_gps_data.Set_XYZ(xyz);
             interpolated_gps_data.ts_ = gps_t1 + delta_t1_abs;
             interpolated_gps_data.fix_ = gps_data[data_idx].fix_;
@@ -83,3 +88,26 @@ void gopro_input_telemetry::get_gps_data_at_time(const double camera_timestamp,
                                           interpolated_data);
     }
 }
+
+void gopro_input_telemetry::get_imu_data_between_time(
+        const double last_timestamp,
+        const double current_timestamp,
+        std::vector<openvslam::imu::data> &imu_data) {
+
+    for (size_t i = 0; i < imu_data_.size(); ++i) {
+        const double imu_t = imu_data_[i].ts_ + imu_config_.get_imu_to_cam_time_offset();
+        if (imu_t < last_timestamp) {
+            continue;
+        }
+        if (imu_t > current_timestamp) {
+            break;
+        }
+
+        imu_data.push_back(imu_data_[i]);
+    }
+}
+
+openvslam::imu::config gopro_input_telemetry::get_imu_config() const {
+    return imu_config_;
+}
+

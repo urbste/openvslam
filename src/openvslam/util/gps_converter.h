@@ -50,6 +50,10 @@ public:
     // latitude and longitude should be in degrees and the altitude in meters. The
     // returned ECEF coordinates will be in meters.
     static Vec3_t LLAToECEF(const Vec3_t& lla);
+
+
+    static Vec3_t ToENU(const Vec3_t& ecef, const Vec3_t& lla0);
+    static Vec3_t ENUToECEF(const Vec3_t& enu, const Vec3_t& lla0);
 };
 
 } // namespace util

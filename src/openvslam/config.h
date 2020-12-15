@@ -3,6 +3,7 @@
 
 #include "openvslam/camera/base.h"
 #include "openvslam/feature/orb_params.h"
+#include "openvslam/imu/config.h"
 
 #include <yaml-cpp/yaml.h>
 

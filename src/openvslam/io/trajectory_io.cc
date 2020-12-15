@@ -101,7 +101,7 @@ void trajectory_io::save_frame_trajectory(const std::string& path, const std::st
             const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
             const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
             Vec3_t llh;
-            util::gps_converter::ECEFToLLA_new(trans_wc * gps_scaler, llh);
+            util::gps_converter::ECEFToLLA_new(trans_wc, llh);
             const Quat_t quat_wc = Quat_t(rot_wc);
 
             json_output[framename]["quaternion_wc"]["w"] = quat_wc.w();
@@ -194,7 +194,7 @@ void trajectory_io::save_keyframe_trajectory(const std::string& path, const std:
             const Mat33_t& rot_wc = cam_pose_wc.block<3, 3>(0, 0);
             const Vec3_t& trans_wc = cam_pose_wc.block<3, 1>(0, 3);
             Vec3_t llh;
-            util::gps_converter::ECEFToLLA_new(trans_wc * gps_scaler, llh);
+            util::gps_converter::ECEFToLLA_new(trans_wc, llh);
             const Quat_t quat_wc = Quat_t(rot_wc);
 
             json_output[framename]["quaternion_wc"]["w"] = quat_wc.w();

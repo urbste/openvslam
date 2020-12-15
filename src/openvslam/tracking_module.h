@@ -5,6 +5,7 @@
 #include "openvslam/data/frame.h"
 #include "openvslam/gps/data.h"
 #include "openvslam/imu/data.h"
+#include "openvslam/imu/config.h"
 #include "openvslam/module/initializer.h"
 #include "openvslam/module/relocalizer.h"
 #include "openvslam/module/keyframe_inserter.h"
@@ -131,6 +132,9 @@ public:
     //! elapsed microseconds for each tracking
     double elapsed_ms_ = 0.0;
 
+    //! set imu config
+    void set_imu_config(const imu::config &imu_config);
+
 protected:
     //-----------------------------------------
     // tracking processes
@@ -173,6 +177,9 @@ protected:
 
     //! Insert the new keyframe derived from the current frame
     void insert_new_keyframe();
+
+    //! update the camera rotation using the gyro data
+    void update_gyro_rotation();
 
     //! system
     system* system_ = nullptr;
@@ -271,6 +278,15 @@ protected:
 
     //! Pause of the tracking module is requested or not
     bool pause_is_requested_ = false;
+
+    //! enable gyro rotation estimation
+    bool gyro_enabled_ = false;
+
+    //! imu config
+    imu::config imu_config_;
+
+    //! old gyro index
+    unsigned int old_gyro_index_ = 0;
 };
 
 } // namespace openvslam

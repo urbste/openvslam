@@ -2,6 +2,7 @@
 #define OPENVSLAM_IMU_CONFIG_H
 
 #include "openvslam/type.h"
+#include <yaml-cpp/yaml.h>
 
 namespace openvslam {
 namespace imu {
@@ -10,6 +11,10 @@ class config {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     config() {}
+
+    //! YAML node Constructor
+    config(const YAML::Node& yaml_node);
+
     //! Constructor
     config(const std::string& name, const double rate_hz, const Mat44_t& rel_pose_ic,
            const double ns_acc, const double ns_gyr, const double rw_acc_bias, const double rw_gyr_bias);
@@ -45,6 +50,8 @@ public:
     void set_acc_bias_random_walk(const double rw_acc_bias);
     //! Set random walk of gyroscope sensor bias [rad/s^2/sqrt(Hz)]
     void set_gyr_bias_random_walk(const double rw_gyr_bias);
+    //! Set imu to camera time offset
+    void set_imu_to_cam_time_offset(const double offset);
 
     //! Get acceleration covariance [(m/s^2)^2]
     Mat33_t get_acc_covariance() const;
@@ -54,6 +61,8 @@ public:
     Mat33_t get_acc_bias_covariance() const;
     //! Get gyroscope bias covariance [(rad/s^2)^2]
     Mat33_t get_gyr_bias_covariance() const;
+    //! Get imu to camera time offset [s]
+    double get_imu_to_cam_time_offset() const;
 
 private:
     //! Update rel_pose_ci_ using rel_pose_ic_
@@ -67,6 +76,9 @@ private:
     double rate_hz_;
     //! IMU rate [s]
     double rate_dt_;
+
+    //! IMU to camera time offset [s]
+    double imu_to_cam_td_ = 0.0;
 
     //! IMU's relative pose w.r.t the camera
     Mat44_t rel_pose_ic_;

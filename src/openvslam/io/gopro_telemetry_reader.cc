@@ -26,27 +26,29 @@ bool ReadGoProTelemetryJson(const std::string& path_to_telemetry_file,
     gopro_imu_data.resize(gyro.size());
     for (unsigned int i = 0; i < gyro.size(); ++i) {
         Vec3_t accl_vec;
-        accl_vec << accl[i]["value"][0],
-                accl[i]["value"][1], accl[i]["value"][2];
+        accl_vec << accl[i]["value"][1],
+                accl[i]["value"][2], accl[i]["value"][0];
         Vec3_t gyro_vec;
-        gyro_vec << gyro[i]["value"][0],
-                gyro[i]["value"][1], gyro[i]["value"][2];
+        gyro_vec << gyro[i]["value"][1],
+                gyro[i]["value"][2], gyro[i]["value"][0];
 
-        gopro_imu_data[i] = openvslam::imu::data(accl[i]["value"][0],
-                accl[i]["value"][1], accl[i]["value"][2],
-                gyro[i]["value"][0], gyro[i]["value"][1],
-                gyro[i]["value"][2], gyro[i]["cts"]);
+        gopro_imu_data[i] = openvslam::imu::data(accl[i]["value"][1],
+                accl[i]["value"][2], accl[i]["value"][0],
+                gyro[i]["value"][1], gyro[i]["value"][2],
+                gyro[i]["value"][0], gyro[i]["cts"]);
         gopro_imu_data[i].ts_ /= 1000.0;  // to seconds
     }
     // now set imu config
     const double imu_hz = 1.0 / (gopro_imu_data[1].ts_ - gopro_imu_data[0].ts_);
-    gopro_imu_config = openvslam::imu::config("gopro_imu",imu_hz, Mat44_t::Identity(),
-                                              0.0,0.0,0.0,0.0);
+    //gopro_imu_config = openvslam::imu::config("gopro_imu",imu_hz, Mat44_t::Identity(),
+    //                                          0.0,0.0,0.0,0.0);
     spdlog::debug("Loaded GoPro IMU Telemetry. Found "+
                   std::to_string(gopro_imu_data.size())+" datapoints.");
     spdlog::debug("IMU was running at approx. "+std::to_string(imu_hz)+" Hz.");
 
     gopro_gps_data.resize(gps5.size());
+    Vec3_t llh_ref;
+    bool set_llh_ref = false;
     for (unsigned int i = 0; i < gps5.size(); ++i) {
         gopro_gps_data[i] = openvslam::gps::data(
                 gps5[i]["value"][0],  // longitude
@@ -58,6 +60,11 @@ bool ReadGoProTelemetryJson(const std::string& path_to_telemetry_file,
                 gps5[i]["value"][4],  // speed 3d
                 gps5[i]["cts"]);      // timestamp
         gopro_gps_data[i].ts_ /= 1000.0; // to seconds
+        if (gopro_gps_data[i].fix_ && !set_llh_ref) {
+            llh_ref = gopro_gps_data[i].llh_;
+            set_llh_ref = true;
+        }
+        gopro_gps_data[i].Set_ENUReferenceLLH(llh_ref); // set local enu reference to first gps reading
     }
 
     const double gps_hz = 1.0 / (gopro_gps_data[1].ts_ - gopro_gps_data[0].ts_);

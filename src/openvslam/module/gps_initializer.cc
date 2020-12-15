@@ -63,7 +63,7 @@ bool gps_initializer::start_map_scale_initalization() {
     for (auto kf : kfs) {
         const auto gps = kf->get_gps_data();
         if (gps.fix_ == gps::gps_fix_state_t::FIX_3D) {
-            gps_pos.push_back(gps.scaled_xyz_);
+            gps_pos.push_back(gps.enu_);
             cam_pos.push_back(kf->get_cam_center());
         }
     }
@@ -81,7 +81,7 @@ bool gps_initializer::start_map_scale_initalization() {
         sum_cam_diff += (cam_pos[i] - mean_cam).squaredNorm();
     }
     const double scale = std::sqrt(sum_gps_diff/sum_cam_diff);
-    const double diff_to_last = std::abs(last_scale_estimate_ - scale) * gps_scaler;
+    const double diff_to_last = std::abs(last_scale_estimate_ - scale);
     last_scale_estimate_ = scale;
     std::cout<<"Estimated scale: "<<scale<<std::endl;
     std::cout<<"Diff to last estimate: "<<diff_to_last<<std::endl;
@@ -91,7 +91,7 @@ bool gps_initializer::start_map_scale_initalization() {
     double total_distance_traveled = 0.0;
     // calculate traveled distance
     //for (size_t i = 1; i < gps_pos.size(); ++i) {
-    total_distance_traveled = (gps_pos[gps_pos.size()-1]-gps_pos[0]).norm() * gps_scaler;
+    total_distance_traveled = (gps_pos[gps_pos.size()-1]-gps_pos[0]).norm();
     //}
 
     if (total_distance_traveled < min_traveled_distance_) {
@@ -157,13 +157,13 @@ bool gps_initializer::start_map_rotation_initalization() {
     for (auto kf : kfs) {
         const auto gps = kf->get_gps_data();
         if (gps.fix_ == gps::gps_fix_state_t::FIX_3D) {
-            gps_pos.push_back(gps.scaled_xyz_);
+            gps_pos.push_back(gps.enu_);
             cam_pos.push_back(kf->get_cam_center());
         }
     }
     const unsigned int min_num_inliers = 30;
-    const double max_chi2_sqrt = 0.15 / gps_scaler;
-    const double min_lambda2 = 1.0 / gps_scaler;
+    const double max_chi2_sqrt = 0.15;
+    const double min_lambda2 = 1.0;
     solve::sim3_solver solver(gps_pos, cam_pos, false,
                               min_num_inliers, max_chi2_sqrt, min_lambda2);
     unsigned int nr_inliers = solver.find_pcl_alignment(200, 6);

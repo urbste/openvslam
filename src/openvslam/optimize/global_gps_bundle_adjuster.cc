@@ -95,11 +95,11 @@ void global_gps_bundle_adjuster::optimize(const unsigned int lead_keyfrm_id_in_g
         if (keyfrm->get_gps_data().fix_ == gps::gps_fix_state_t::FIX_3D) {
             auto gps_edge = new g2o::se3::gps_prior_edge();
             const gps::data gps_data = keyfrm->get_gps_data();
-            gps_edge->setMeasurement(gps_data.scaled_xyz_);
+            gps_edge->setMeasurement(gps_data.enu_);
             Mat33_t info_mat = Mat33_t::Identity();
-            info_mat(0,0) = gps_data.dop_precision_ / 10.0 / gps_scaler;
-            info_mat(1,1) = gps_data.dop_precision_ / 10.0/ gps_scaler;
-            info_mat(2,2) = gps_data.dop_precision_ / 100.0 / gps_scaler; // height 10 times worse
+            info_mat(0,0) = gps_data.dop_precision_ / 10.0;
+            info_mat(1,1) = gps_data.dop_precision_ / 10.0;
+            info_mat(2,2) = gps_data.dop_precision_ / 100.0; // height 10 times worse
             gps_edge->setInformation(info_mat);
             gps_edge->setVertex(0, keyfrm_vtx);
             gps_edge->setParameterId(0,0);

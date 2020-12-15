@@ -13,7 +13,6 @@
 
 namespace openvslam {
 
-const double gps_scaler = 1.0;
 
 // floating point type
 

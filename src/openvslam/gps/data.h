@@ -29,11 +29,17 @@ public:
 
     //! Set XYZ data
     void Set_XYZ(const Vec3_t& xyz);
+    //! Set ENU reference llh
+    void Set_ENUReferenceLLH(const Vec3_t& llh_ref);
 
     //! gps measurement in latitude, longitude and height
     Vec3_t llh_;
     //! gps measurement in x y z ellipsoid coordinates
     Vec3_t xyz_;
+    //! gps measurement in earth north up coordinates
+    Vec3_t enu_;
+    //! gps measurement in earth north up coordinates
+    Vec3_t llh_enu_reference_;
     //! scaled gps measurement in x y z ellipsoid coordinates for better numerical stability and plotting
     Vec3_t scaled_xyz_;
     //! dilusion of precision

@@ -56,7 +56,9 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                              "But could not open path "+telemetry_json_path);
             return;
         }
+        //gopro_telemetry_data.set_imu_config(cfg);
         SLAM.set_use_gps_data(); // use provided GPS data
+        //SLAM.set_use_imu_data();
     }
     // create a viewer object
     // and pass the frame_publisher and the map_publisher
@@ -71,7 +73,8 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
 
     cv::Mat frame;
     openvslam::gps::data interpolated_gps_data;
-    double timestamp = 0.0;
+    double curr_timestamp = 0.0;
+    double last_timestamp = 0.0;
 
     unsigned int num_frame = 0;
     unsigned int empty_frame = 0;
@@ -81,7 +84,7 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
     std::thread thread([&]() {
         while (is_not_end) {
             is_not_end = video.read(frame);
-            timestamp = video.get(cv::CAP_PROP_POS_MSEC)/1000.;
+            curr_timestamp = video.get(cv::CAP_PROP_POS_MSEC)/1000.;
             // this is necessary as sometimes frames are missing from e.g. gopro videos
             // and the feed would crash
             if (!is_not_end) {
@@ -101,12 +104,20 @@ void mono_tracking(const std::shared_ptr<openvslam::config>& cfg,
                     cv::resize(frame, frame, cv::Size(cfg->camera_->cols_, cfg->camera_->rows_));
                 }
                 // get gps if available
-                gopro_telemetry_data.get_gps_data_at_time(timestamp, interpolated_gps_data);
+                gopro_telemetry_data.get_gps_data_at_time(curr_timestamp, interpolated_gps_data);
                 if (SLAM.is_gps_data_used()) {
                     SLAM.feed_GPS_data(interpolated_gps_data);
                 }
+                if (last_timestamp > 0.0) {
+                    std::vector<openvslam::imu::data> imu_data;
+                    gopro_telemetry_data.get_imu_data_between_time(last_timestamp, curr_timestamp,imu_data);
+                    for (const auto& imu : imu_data)
+                    SLAM.feed_IMU_data(imu);
+                }
+
                 // input the current frame and estimate the camera pose
-                SLAM.feed_monocular_frame(frame, timestamp, mask);
+                SLAM.feed_monocular_frame(frame, curr_timestamp, mask);
+                last_timestamp = curr_timestamp;
             }
 
             const auto tp_2 = std::chrono::steady_clock::now();

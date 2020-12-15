@@ -1,7 +1,26 @@
 #include "openvslam/imu/config.h"
+#include "g2o/types/slam3d/se3quat.h"
 
 namespace openvslam {
 namespace imu {
+
+config::config(const YAML::Node &yaml_node) {
+    rate_hz_ = yaml_node["IMU.rate"].as<double>(100.0);
+    rate_dt_ = 1.0 / rate_hz_;
+    Vec6_t se3_quat_init;
+    se3_quat_init <<
+            yaml_node["IMU.imu_to_cam.tx"].as<double>(0.0),
+            yaml_node["IMU.imu_to_cam.ty"].as<double>(0.0),
+            yaml_node["IMU.imu_to_cam.tz"].as<double>(0.0),
+            yaml_node["IMU.imu_to_cam.rx"].as<double>(0.0),
+            yaml_node["IMU.imu_to_cam.ry"].as<double>(0.0),
+            yaml_node["IMU.imu_to_cam.rz"].as<double>(0.0);
+    ::g2o::SE3Quat imu_to_cam_trafo(se3_quat_init);
+    rel_pose_ci_ = imu_to_cam_trafo.to_homogeneous_matrix();
+    rel_pose_ic_ = rel_pose_ci_.inverse();
+
+    imu_to_cam_td_ = yaml_node["IMU.imu_to_cam.td"].as<double>(0.0);
+}
 
 config::config(const std::string& name, const double rate_hz, const Mat44_t& rel_pose_ic,
                const double ns_acc, const double ns_gyr, const double rw_acc_bias, const double rw_gyr_bias)
@@ -67,6 +86,10 @@ void config::set_gyr_bias_random_walk(const double rw_gyr_bias) {
     update_covariance();
 }
 
+void config::set_imu_to_cam_time_offset(const double offset) {
+    imu_to_cam_td_ = offset;
+}
+
 Mat33_t config::get_acc_covariance() const {
     return cov_acc_;
 }
@@ -81,6 +104,10 @@ Mat33_t config::get_acc_bias_covariance() const {
 
 Mat33_t config::get_gyr_bias_covariance() const {
     return cov_gyr_bias_;
+}
+
+double config::get_imu_to_cam_time_offset() const {
+    return imu_to_cam_td_;
 }
 
 void config::update_pose() {

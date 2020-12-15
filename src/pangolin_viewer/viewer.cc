@@ -228,7 +228,7 @@ void viewer::draw_keyframes() {
             glColor3fv(cs_.gps_xyz_.data());
             glBegin(GL_POINTS);
 
-            openvslam::Vec3_t pos_w = keyfrm->get_gps_data().xyz_;
+            openvslam::Vec3_t pos_w = keyfrm->get_gps_data().enu_;
             pos_w /= 1.0;
             glVertex3fv(pos_w.cast<float>().eval().data());
 

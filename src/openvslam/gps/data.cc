@@ -11,7 +11,8 @@ data::data(const double latitude, const double longitude, const double height,
     : llh_(latitude, longitude, height), dop_precision_(dop_precision),
       speed_2d_(speed_2d), speed_3d_(speed_3d), fix_(fix), ts_(ts) {
     xyz_ = openvslam::util::gps_converter::LLAToECEF(llh_);
-    scaled_xyz_ = xyz_ / gps_scaler;
+    enu_ = openvslam::util::gps_converter::ToENU(xyz_, llh_enu_reference_);
+    scaled_xyz_ = xyz_;
 }
 
 data::data(const Vec3_t& llh,  const double dop_precision,
@@ -20,13 +21,20 @@ data::data(const Vec3_t& llh,  const double dop_precision,
     : llh_(llh), dop_precision_(dop_precision),
       speed_2d_(speed_2d), speed_3d_(speed_3d), fix_(fix), ts_(ts) {
     xyz_ = openvslam::util::gps_converter::LLAToECEF(llh_);
-    scaled_xyz_ = xyz_ / gps_scaler;
+    enu_ = openvslam::util::gps_converter::ToENU(xyz_, llh_enu_reference_);
+    scaled_xyz_ = xyz_;
 }
 
 void data::Set_XYZ(const Vec3_t &xyz) {
     xyz_ = xyz;
-    scaled_xyz_ = xyz_ / gps_scaler;
+    scaled_xyz_ = xyz_ ;
     llh_ = openvslam::util::gps_converter::ECEFToLLA(xyz);
+    enu_ = openvslam::util::gps_converter::ToENU(xyz_, llh_enu_reference_);
+}
+
+void data::Set_ENUReferenceLLH(const Vec3_t& llh_ref) {
+    llh_enu_reference_ = llh_ref;
+    enu_ = openvslam::util::gps_converter::ToENU(xyz_, llh_enu_reference_);
 }
 
 } // namespace gps
